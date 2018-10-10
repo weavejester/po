@@ -1,1 +1,2 @@
-hello: echo Hello World
+hello:
+  run: echo Hello World

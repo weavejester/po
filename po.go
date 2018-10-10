@@ -10,6 +10,10 @@ import (
 	"os/exec"
 )
 
+type Command struct {
+	Run string
+}
+
 var rootCmd = &cobra.Command{
 	Use:     "po",
 	Short:   "FIXME",
@@ -19,14 +23,14 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func readCommandsFromYamlFile(path string, m *map[string]string) error {
+func readCommandsFromYamlFile(path string, config *map[string]Command) error {
 	dat, err := ioutil.ReadFile(path)
 
 	if err != nil {
 		return err
 	}
 
-	err = yaml.Unmarshal(dat, &m)
+	err = yaml.Unmarshal(dat, &config)
 
 	if err != nil {
 		return err
@@ -35,33 +39,31 @@ func readCommandsFromYamlFile(path string, m *map[string]string) error {
 	return nil
 }
 
-func buildCommands(parentCmd *cobra.Command, m *map[string]string) {
-	for k, v := range *m {
-		cmd := &cobra.Command{
-			Use: k,
+func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
+	for use, command := range *config {
+		parentCmd.AddCommand(&cobra.Command{
+			Use: use,
 			Run: func(c *cobra.Command, args []string) {
-				shellCmd := exec.Command("sh", "-c", v)
+				shellCmd := exec.Command("sh", "-c", command.Run)
 				shellCmd.Stdin = os.Stdin
 				shellCmd.Stdout = os.Stdout
 				shellCmd.Stderr = os.Stderr
 				shellCmd.Run()
 			},
-		}
-
-		parentCmd.AddCommand(cmd)
+		})
 	}
 }
 
 func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 
-	m := make(map[string]string)
+	config := make(map[string]Command)
 
-	if err := readCommandsFromYamlFile("po.yml", &m); err != nil {
+	if err := readCommandsFromYamlFile("po.yml", &config); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
-	buildCommands(rootCmd, &m)
+	buildCommands(rootCmd, &config)
 }
 
 func main() {
