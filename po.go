@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"gopkg.in/yaml.v2"
+	"io/ioutil"
+	"log"
 	"os"
 )
 
@@ -11,7 +14,23 @@ var rootCmd = &cobra.Command{
 	Short:   "FIXME",
 	Long:    "FIXME",
 	Version: "0.0.1",
-	Run:     func(c *cobra.Command, args []string) {},
+	Run:     func(c *cobra.Command, args []string) {
+		dat, err := ioutil.ReadFile("po.yml")
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		m := make(map[interface{}]interface{})
+
+		err = yaml.Unmarshal(dat, &m)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Println(m)
+	},
 }
 
 func main() {
