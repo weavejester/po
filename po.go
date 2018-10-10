@@ -33,6 +33,10 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+func init() {
+	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
+}
+
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
