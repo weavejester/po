@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"syscall"
 )
 
 type Command struct {
@@ -41,16 +42,33 @@ func readCommandsFromYamlFile(path string, config *map[string]Command) error {
 	return nil
 }
 
+func execShell(shellCmd string) error {
+	sh, err := exec.LookPath("sh")
+
+	if err != nil {
+		return err
+	}
+
+	args := []string{"sh", "-c", shellCmd}
+	env := os.Environ()
+
+	err = syscall.Exec(sh, args, env)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 	for use, command := range *config {
 		parentCmd.AddCommand(&cobra.Command{
 			Use: use,
 			Run: func(cmd *cobra.Command, args []string) {
-				shellCmd := exec.Command("sh", "-c", command.Run)
-				shellCmd.Stdin = os.Stdin
-				shellCmd.Stdout = os.Stdout
-				shellCmd.Stderr = os.Stderr
-				shellCmd.Run()
+				if err := execShell(command.Run); err != nil {
+					log.Fatalf("error: %v", err)
+				}
 			},
 		})
 	}
