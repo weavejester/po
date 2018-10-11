@@ -2,4 +2,5 @@ greet:
   short: Prints a message.
   long: |
     An example command that just prints a short message.
-  run: echo Hello World
+  args: [name]
+  run: echo Hello $name

@@ -14,6 +14,7 @@ import (
 type Command struct {
 	Short string
 	Long string
+	Args []string
 	Run string
 }
 
@@ -44,7 +45,27 @@ func readYamlFile(path string, config *map[string]Command) error {
 	return nil
 }
 
-func execShell(shellCmd string) error {
+func argEnvVars(defs []string, args []string) []string {
+	env := make([]string, len(defs))
+
+	for i, def := range defs {
+		env[i] = fmt.Sprintf("%s=%s", def, args[i])
+	}
+
+	return env
+}
+
+func argsMatchDefs(defs []string) cobra.PositionalArgs {
+	return func(cmd *cobra.Command, args []string) error {
+		if (len(defs) != len(args)) {
+			return fmt.Errorf("requires exactly %d arguments", len(defs))
+		}
+
+		return nil
+	}
+}
+
+func execShell(shellCmd string, env []string) error {
 	sh, err := exec.LookPath("sh")
 
 	if err != nil {
@@ -52,7 +73,6 @@ func execShell(shellCmd string) error {
 	}
 
 	args := []string{"sh", "-c", shellCmd}
-	env := os.Environ()
 
 	err = syscall.Exec(sh, args, env)
 
@@ -69,8 +89,11 @@ func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 			Use:   use,
 			Short: command.Short,
 			Long:  command.Long,
+			Args:  argsMatchDefs(command.Args),
 			Run: func(cmd *cobra.Command, args []string) {
-				if err := execShell(command.Run); err != nil {
+				env := append(os.Environ(), argEnvVars(command.Args, args)...)
+
+				if err := execShell(command.Run, env); err != nil {
 					log.Fatalf("error: %v", err)
 				}
 			},
