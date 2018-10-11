@@ -19,7 +19,9 @@ var rootCmd = &cobra.Command{
 	Short:   "FIXME",
 	Long:    "FIXME",
 	Version: "0.0.1",
-	Run: func(c *cobra.Command, args []string) {
+	Run: func(cmd *cobra.Command, args []string) {
+		cmd.Help()
+		os.Exit(0)
 	},
 }
 
@@ -43,7 +45,7 @@ func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 	for use, command := range *config {
 		parentCmd.AddCommand(&cobra.Command{
 			Use: use,
-			Run: func(c *cobra.Command, args []string) {
+			Run: func(cmd *cobra.Command, args []string) {
 				shellCmd := exec.Command("sh", "-c", command.Run)
 				shellCmd.Stdin = os.Stdin
 				shellCmd.Stdout = os.Stdout
