@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 )
 
@@ -83,10 +84,14 @@ func execShell(shellCmd string, env []string) error {
 	return nil
 }
 
+func formatUsage(name string, command *Command) string {
+	return fmt.Sprintf("%s %s", name, strings.Join(command.Args, " "))
+}
+
 func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
-	for use, command := range *config {
+	for name, command := range *config {
 		parentCmd.AddCommand(&cobra.Command{
-			Use:   use,
+			Use:   formatUsage(name, &command),
 			Short: command.Short,
 			Long:  command.Long,
 			Args:  argsMatchDefs(command.Args),
