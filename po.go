@@ -14,9 +14,9 @@ import (
 
 type Command struct {
 	Short string
-	Long string
-	Args []string
-	Run string
+	Long  string
+	Args  []string
+	Run   string
 }
 
 var rootCmd = &cobra.Command{
@@ -46,20 +46,77 @@ func readYamlFile(path string, config *map[string]Command) error {
 	return nil
 }
 
+func argVarName(def string) string {
+	return strings.TrimRight(def, "+*?")
+}
+
+func lastChar(s string) byte {
+	return s[len(s)-1]
+}
+
+func envVarPair(def string, vals ...string) string {
+	return fmt.Sprintf("%s=%s", argVarName(def), strings.Join(vals, " "))
+}
+
 func argEnvVars(defs []string, args []string) []string {
 	env := make([]string, len(defs))
 
-	for i, def := range defs {
-		env[i] = fmt.Sprintf("%s=%s", def, args[i])
+	for i := 0; i < len(args); i++ {
+		def := defs[i]
+		last := lastChar(def)
+
+		if last == '*' || last == '+' {
+			env[i] = envVarPair(def, args[i:]...)
+			break
+		} else {
+			env[i] = envVarPair(def, args[i])
+		}
 	}
 
 	return env
 }
 
+func minArgLength(defs []string) int {
+	minLength := 0
+
+	for _, def := range defs {
+		last := lastChar(def)
+
+		if last != '?' && last != '*' {
+			minLength++
+		}
+	}
+
+	return minLength
+}
+
+func hasArgMaxLength(defs []string) bool {
+	for _, def := range defs {
+		last := lastChar(def)
+
+		if last == '*' || last == '+' {
+			return false
+		}
+	}
+
+	return true
+}
+
 func argsMatchDefs(defs []string) cobra.PositionalArgs {
+	minLength := minArgLength(defs)
+	maxLength := len(defs)
+	hasMaxLength := hasArgMaxLength(defs)
+	hasExactLength := hasMaxLength && minLength == maxLength
+
 	return func(cmd *cobra.Command, args []string) error {
-		if (len(defs) != len(args)) {
-			return fmt.Errorf("requires exactly %d arguments", len(defs))
+		if hasExactLength && len(args) != maxLength {
+			return fmt.Errorf("requires exactly %d arguments", maxLength)
+		} else if hasMaxLength && (len(args) < minLength || len(args) > maxLength) {
+			return fmt.Errorf("requires between %d and %d arguments", minLength, maxLength)
+		} else if len(args) < minLength {
+			return fmt.Errorf("requires at least %d arguments", minLength)
+		} else if hasMaxLength && len(args) > maxLength {
+			return fmt.Errorf("requires at most %d arguments", maxLength)
 		}
 
 		return nil
@@ -84,8 +141,29 @@ func execShell(shellCmd string, env []string) error {
 	return nil
 }
 
+func formatArgDef(def string) string {
+	def = strings.ToUpper(def)
+
+	switch lastChar(def) {
+	case '?':
+		return fmt.Sprintf("[%s]", def)
+	case '+':
+		return fmt.Sprintf("[%s...]", def)
+	case '*':
+		return fmt.Sprintf("%s...", def)
+	default:
+		return def
+	}
+}
+
 func formatUsage(name string, command *Command) string {
-	return fmt.Sprintf("%s %s", name, strings.Join(command.Args, " "))
+	usageArgs := name
+
+	for _, arg := range command.Args {
+		usageArgs += " " + formatArgDef(arg)
+	}
+
+	return usageArgs
 }
 
 func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
