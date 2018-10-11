@@ -12,10 +12,32 @@ import (
 	"syscall"
 )
 
+type Argument struct {
+	Var      string
+	AtLeastP *int `yaml:"at_least"`
+	AtMostP  *int `yaml:"at_most"`
+}
+
+func (arg Argument) AtLeast() int {
+	if arg.AtLeastP == nil {
+		return 1
+	} else {
+		return *arg.AtLeastP
+	}
+}
+
+func (arg Argument) AtMost() int {
+	if arg.AtMostP == nil {
+		return arg.AtLeast()
+	} else {
+		return *arg.AtMostP
+	}
+}
+
 type Command struct {
 	Short string
 	Long  string
-	Args  []string
+	Args  []Argument
 	Run   string
 }
 
@@ -46,77 +68,66 @@ func readYamlFile(path string, config *map[string]Command) error {
 	return nil
 }
 
-func argVarName(def string) string {
-	return strings.TrimRight(def, "+*?")
-}
-
-func lastChar(s string) byte {
-	return s[len(s)-1]
-}
-
-func envVarPair(def string, vals ...string) string {
-	return fmt.Sprintf("%s=%s", argVarName(def), strings.Join(vals, " "))
-}
-
-func argEnvVars(defs []string, args []string) []string {
-	env := make([]string, len(defs))
-
-	for i := 0; i < len(args); i++ {
-		def := defs[i]
-		last := lastChar(def)
-
-		if last == '*' || last == '+' {
-			env[i] = envVarPair(def, args[i:]...)
-			break
-		} else {
-			env[i] = envVarPair(def, args[i])
-		}
-	}
-
-	return env
-}
-
-func minArgLength(defs []string) int {
+func minArgLength(defs []Argument) int {
 	minLength := 0
 
 	for _, def := range defs {
-		last := lastChar(def)
-
-		if last != '?' && last != '*' {
-			minLength++
-		}
+		minLength += def.AtLeast()
 	}
 
 	return minLength
 }
 
-func hasArgMaxLength(defs []string) bool {
-	for _, def := range defs {
-		last := lastChar(def)
+func maxArgLength(defs []Argument) int {
+	maxLength := 0
 
-		if last == '*' || last == '+' {
-			return false
-		}
+	for _, def := range defs {
+		maxLength += def.AtMost()
 	}
 
-	return true
+	return maxLength
 }
 
-func argsMatchDefs(defs []string) cobra.PositionalArgs {
+func envVarPair(def Argument, vals []string) string {
+	return fmt.Sprintf("%s=%s", def.Var, strings.Join(vals, " "))
+}
+
+func argEnvVars(defs []Argument, args []string) []string {
+	env := make([]string, len(defs))
+	required := minArgLength(defs)
+	a := 0
+
+	for i, def := range defs {
+		required -= def.AtLeast()
+		aNext := a + def.AtMost()
+
+		if aNext > len(args)-required {
+			aNext = len(args)
+		}
+
+		env[i] = envVarPair(def, args[a:aNext])
+		a = aNext
+	}
+
+	return env
+}
+
+func argsMatchDefs(defs []Argument) cobra.PositionalArgs {
 	minLength := minArgLength(defs)
-	maxLength := len(defs)
-	hasMaxLength := hasArgMaxLength(defs)
-	hasExactLength := hasMaxLength && minLength == maxLength
+	maxLength := maxArgLength(defs)
 
 	return func(cmd *cobra.Command, args []string) error {
-		if hasExactLength && len(args) != maxLength {
+		switch {
+		case minLength == 0 && maxLength == 0 && len(args) > 0:
+			return fmt.Errorf("should have no arguments")
+		case minLength == maxLength && len(args) != maxLength:
 			return fmt.Errorf("requires exactly %d arguments", maxLength)
-		} else if hasMaxLength && (len(args) < minLength || len(args) > maxLength) {
+		case maxLength > 0 && minLength > 0 && (len(args) < minLength || len(args) > maxLength):
 			return fmt.Errorf("requires between %d and %d arguments", minLength, maxLength)
-		} else if len(args) < minLength {
-			return fmt.Errorf("requires at least %d arguments", minLength)
-		} else if hasMaxLength && len(args) > maxLength {
+		case maxLength > 0 && len(args) > maxLength:
 			return fmt.Errorf("requires at most %d arguments", maxLength)
+		case len(args) < minLength:
+			return fmt.Errorf("requires at least %d arguments", minLength)
 		}
 
 		return nil
@@ -141,19 +152,18 @@ func execShell(shellCmd string, env []string) error {
 	return nil
 }
 
-func formatArgDef(def string) string {
-	def = strings.ToUpper(def)
+func formatArgDef(def Argument) string {
+	arg := strings.ToUpper(def.Var)
 
-	switch lastChar(def) {
-	case '?':
-		return fmt.Sprintf("[%s]", def)
-	case '+':
-		return fmt.Sprintf("[%s...]", def)
-	case '*':
-		return fmt.Sprintf("%s...", def)
-	default:
-		return def
+	if def.AtLeast() > 1 || def.AtMost() > 1 {
+		arg = fmt.Sprintf("%s...", arg)
 	}
+
+	if def.AtLeast() < 1 {
+		arg = fmt.Sprintf("[%s]", arg)
+	}
+
+	return arg
 }
 
 func formatUsage(name string, command *Command) string {
