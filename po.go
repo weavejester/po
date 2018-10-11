@@ -26,7 +26,7 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func readCommandsFromYamlFile(path string, config *map[string]Command) error {
+func readYamlFile(path string, config *map[string]Command) error {
 	dat, err := ioutil.ReadFile(path)
 
 	if err != nil {
@@ -79,7 +79,7 @@ func init() {
 
 	config := make(map[string]Command)
 
-	if err := readCommandsFromYamlFile("po.yml", &config); err != nil {
+	if err := readYamlFile("po.yml", &config); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
