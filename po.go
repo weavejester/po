@@ -12,6 +12,8 @@ import (
 )
 
 type Command struct {
+	Short string
+	Long string
 	Run string
 }
 
@@ -64,7 +66,9 @@ func execShell(shellCmd string) error {
 func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 	for use, command := range *config {
 		parentCmd.AddCommand(&cobra.Command{
-			Use: use,
+			Use:   use,
+			Short: command.Short,
+			Long:  command.Long,
 			Run: func(cmd *cobra.Command, args []string) {
 				if err := execShell(command.Run); err != nil {
 					log.Fatalf("error: %v", err)

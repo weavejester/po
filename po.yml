@@ -1,2 +1,5 @@
-hello:
+greet:
+  short: Prints a message.
+  long: |
+    An example command that just prints a short message.
   run: echo Hello World
