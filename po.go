@@ -495,6 +495,13 @@ func buildCommandsFromConfig(parentCmd *cobra.Command, config *map[string]Comman
 	return nil
 }
 
+func printError(cmd *cobra.Command, err error) {
+	boldRed := color.New(color.Bold, color.FgRed)
+	boldRed.Fprintf(os.Stderr, "ERROR")
+	fmt.Fprintf(os.Stderr, " [%s]: %s\n", cmd.CommandPath(), err)
+	fmt.Fprintf(os.Stderr, "Run '%v --help' for usage.\n", cmd.CommandPath())
+}
+
 func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	rootCmd.SetUsageFunc(rootUsageFunc)
@@ -502,21 +509,19 @@ func init() {
 	config := make(map[string]Command)
 
 	if err := loadConfig(&config); err != nil {
-		log.Fatalf("error: %v", err)
+		printError(rootCmd, err)
+		os.Exit(2)
 	}
 
 	if err := buildCommandsFromConfig(rootCmd, &config); err != nil {
-		log.Fatalf("error: %v", err)
+		printError(rootCmd, err)
+		os.Exit(3)
 	}
 }
 
 func main() {
 	if cmd, err := rootCmd.ExecuteC(); err != nil {
-		out := cmd.OutOrStderr()
-		boldRed := color.New(color.Bold, color.FgRed)
-		boldRed.Fprintf(out, "ERROR")
-		fmt.Fprintf(out, ": '%s' command %s\n", cmd.Name(), err)
-		fmt.Fprintf(out, "Run '%v --help' for usage.\n", cmd.CommandPath())
+		printError(cmd, err)
 		os.Exit(1)
 	}
 }
