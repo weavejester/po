@@ -315,9 +315,11 @@ func rootUsageFunc(rootCmd *cobra.Command) error {
 		fmt.Fprintf(out, rootCmd.LocalFlags().FlagUsages())
 	}
 
+	bold.Fprintf(out, "\nCOMMANDS\n")
 	if rootCmd.HasAvailableSubCommands() {
-		bold.Fprintf(out, "\nCOMMANDS\n")
 		fmt.Fprintf(out, commandUsages(rootCmd))
+	} else {
+		fmt.Fprintln(out, "  No commands found. Have you created a po.yml file?")
 	}
 
 	return nil
