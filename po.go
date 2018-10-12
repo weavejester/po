@@ -147,20 +147,35 @@ func argEnvVars(defs []Argument, args []string) []string {
 	return env
 }
 
-func countSetFlags(flags *pflag.FlagSet) int {
+func visitFlagsWithValues(flags *pflag.FlagSet, fn func(*pflag.Flag)) {
+	flags.VisitAll(func(flag *pflag.Flag) {
+		if flag.Changed || flag.DefValue != "" {
+			fn(flag)
+		}
+	})
+}
+
+func flagValueOrDefault(flag *pflag.Flag) string {
+	if flag.Changed {
+		return flag.Value.String()
+	}
+	return flag.DefValue
+}
+
+func countFlagsWithValues(flags *pflag.FlagSet) int {
 	count := 0
-	flags.Visit(func(f *pflag.Flag) { count++ })
+	visitFlagsWithValues(flags, func(f *pflag.Flag) { count++ })
 	return count
 }
 
 func flagEnvVars(flags *pflag.FlagSet) []string {
-	env := make([]string, countSetFlags(flags))
+	env := make([]string, countFlagsWithValues(flags))
 	i := 0
 
-	flags.Visit(func(f *pflag.Flag) {
-		env[i] = fmt.Sprintf("%s=%s", f.Name, f.Value.String())
+	visitFlagsWithValues(flags, func(f *pflag.Flag) {
+		env[i] = fmt.Sprintf("%s=%s", f.Name, flagValueOrDefault(f))
 	})
-	
+
 	return env
 }
 
