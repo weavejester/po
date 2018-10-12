@@ -219,6 +219,36 @@ func argUsages(command *Command) string {
 	return usage
 }
 
+func commandUsages(command *cobra.Command) string {
+	usage := ""
+	padding := command.NamePadding()
+
+	for _, cmd := range command.Commands() {
+		usage += fmt.Sprintf("  %s %s\n", rightPad(cmd.Name(), padding), cmd.Short)
+	}
+
+	return usage
+}
+
+func rootUsageFunc(rootCmd *cobra.Command) error {
+	bold := color.New(color.Bold)
+	out := rootCmd.OutOrStderr()
+
+	bold.Fprintf(out, "USAGE\n")
+	fmt.Fprintf(out, "  %s [COMMAND] [FLAGS]\n", rootCmd.CommandPath())
+
+	if rootCmd.HasAvailableSubCommands() {
+		bold.Fprintf(out, "\nCOMMANDS\n")
+		fmt.Fprintf(out, commandUsages(rootCmd))
+	}
+
+	if rootCmd.HasAvailableLocalFlags() {
+		bold.Fprintf(out, "\nFLAGS\n")
+		fmt.Fprintf(out, rootCmd.LocalFlags().FlagUsages())
+	}
+	return nil
+}
+
 func makeUsageFunc(command *Command) func(*cobra.Command) error {
 	bold := color.New(color.Bold)
 
@@ -264,6 +294,7 @@ func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 
 func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
+	rootCmd.SetUsageFunc(rootUsageFunc)
 
 	config := make(map[string]Command)
 
