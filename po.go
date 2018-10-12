@@ -66,10 +66,12 @@ func (cmd *Command) ArgPadding() int {
 }
 
 var rootCmd = &cobra.Command{
-	Use:     "po",
-	Short:   "FIXME",
-	Long:    "FIXME",
-	Version: "0.0.1",
+	Use:           "po",
+	Short:         "FIXME",
+	Long:          "FIXME",
+	Version:       "0.0.1",
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	Run: func(cmd *cobra.Command, args []string) {
 		cmd.Help()
 		os.Exit(0)
@@ -273,8 +275,12 @@ func init() {
 }
 
 func main() {
-	if err := rootCmd.Execute(); err != nil {
-		fmt.Println(err)
+	if cmd, err := rootCmd.ExecuteC(); err != nil {
+		out := cmd.OutOrStderr()
+		boldRed := color.New(color.Bold, color.FgRed)
+		boldRed.Fprintf(out, "ERROR")
+		fmt.Fprintf(out, ": '%s' command %s\n", cmd.Name(), err)
+		fmt.Fprintf(out, "Run '%v --help' for usage.\n", cmd.CommandPath())
 		os.Exit(1)
 	}
 }
