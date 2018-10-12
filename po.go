@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -88,7 +89,9 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-func readYamlFile(path string, config *map[string]Command) error {
+const configFilename = "po.yml"
+
+func readConfigFile(path string, config *map[string]Command) error {
 	dat, err := ioutil.ReadFile(path)
 
 	if err != nil {
@@ -99,6 +102,28 @@ func readYamlFile(path string, config *map[string]Command) error {
 
 	if err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func isRootPath(path string) bool {
+	return path == filepath.Join(path, "..")
+}
+
+func loadConfig(config *map[string]Command) error {
+	currentDir, err := filepath.Abs(".")
+
+	if err != nil {
+		return err
+	}
+
+	for dir := currentDir; !isRootPath(dir); dir = filepath.Join(dir, "..") {
+		configPath := filepath.Join(dir, configFilename)
+
+		if _, err := os.Stat(configPath); err == nil {
+			readConfigFile(configPath, config)
+		}
 	}
 
 	return nil
@@ -436,7 +461,7 @@ func init() {
 
 	config := make(map[string]Command)
 
-	if err := readYamlFile("po.yml", &config); err != nil {
+	if err := loadConfig(&config); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
