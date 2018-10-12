@@ -9,9 +9,10 @@ greet:
 
 bye:
   short: Prints another message
-  args:
-    - var: foo
-      short: a name to say goodbye to
-      at_least: 0
-      at_most: 1
-  run: echo Goodbye $foo
+  flags:
+    name:
+      desc: a name to say goodbye to
+      type: string
+      short: n
+      default: World
+  run: echo Goodbye $name

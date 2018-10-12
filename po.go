@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"log"
@@ -36,10 +37,18 @@ func (arg *Argument) AtMost() int {
 	}
 }
 
+type Flag struct {
+	Desc    string
+	Short   string
+	Type    string
+	Default string
+}
+
 type Command struct {
 	Short string
 	Long  string
 	Args  []Argument
+	Flags map[string]Flag
 	Run   string
 }
 
@@ -114,8 +123,8 @@ func maxArgLength(defs []Argument) int {
 	return maxLength
 }
 
-func envVarPair(def Argument, vals []string) string {
-	return fmt.Sprintf("%s=%s", def.Var, strings.Join(vals, " "))
+func envVarPair(name string, vals []string) string {
+	return fmt.Sprintf("%s=%s", name, strings.Join(vals, " "))
 }
 
 func argEnvVars(defs []Argument, args []string) []string {
@@ -131,10 +140,27 @@ func argEnvVars(defs []Argument, args []string) []string {
 			aNext = len(args)
 		}
 
-		env[i] = envVarPair(def, args[a:aNext])
+		env[i] = envVarPair(def.Var, args[a:aNext])
 		a = aNext
 	}
 
+	return env
+}
+
+func countSetFlags(flags *pflag.FlagSet) int {
+	count := 0
+	flags.Visit(func(f *pflag.Flag) { count++ })
+	return count
+}
+
+func flagEnvVars(flags *pflag.FlagSet) []string {
+	env := make([]string, countSetFlags(flags))
+	i := 0
+
+	flags.Visit(func(f *pflag.Flag) {
+		env[i] = fmt.Sprintf("%s=%s", f.Name, f.Value.String())
+	})
+	
 	return env
 }
 
@@ -273,7 +299,19 @@ func makeUsageFunc(command *Command) func(*cobra.Command) error {
 	}
 }
 
-func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
+func buildFlags(cmd *cobra.Command, flags map[string]Flag) error {
+	for name, flag := range flags {
+		switch flag.Type {
+		case "string":
+			cmd.Flags().StringP(name, flag.Short, flag.Default, flag.Desc)
+		default:
+			return fmt.Errorf("no such type: %v", flag.Type)
+		}
+	}
+	return nil
+}
+
+func buildCommands(parentCmd *cobra.Command, config *map[string]Command) error {
 	for name, command := range *config {
 		argDefs := command.Args
 		script := command.Run
@@ -284,7 +322,9 @@ func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 			Args:                  argsMatchDefs(argDefs),
 			DisableFlagsInUseLine: true,
 			Run: func(cmd *cobra.Command, args []string) {
-				env := append(os.Environ(), argEnvVars(argDefs, args)...)
+				env := os.Environ()
+				env = append(env, argEnvVars(argDefs, args)...)
+				env = append(env, flagEnvVars(cmd.Flags())...)
 
 				if err := execShell(script, env); err != nil {
 					log.Fatalf("error: %v", err)
@@ -292,8 +332,13 @@ func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 			},
 		}
 		cmd.SetUsageFunc(makeUsageFunc(&command))
+
+		if err := buildFlags(&cmd, command.Flags); err != nil {
+			return err
+		}
 		parentCmd.AddCommand(&cmd)
 	}
+	return nil
 }
 
 func init() {
@@ -306,7 +351,9 @@ func init() {
 		log.Fatalf("error: %v", err)
 	}
 
-	buildCommands(rootCmd, &config)
+	if err := buildCommands(rootCmd, &config); err != nil {
+		log.Fatalf("error: %v", err)
+	}
 }
 
 func main() {
