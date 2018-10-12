@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
@@ -14,11 +15,12 @@ import (
 
 type Argument struct {
 	Var      string
+	Short    string
 	AtLeastP *int `yaml:"at_least"`
 	AtMostP  *int `yaml:"at_most"`
 }
 
-func (arg Argument) AtLeast() int {
+func (arg *Argument) AtLeast() int {
 	if arg.AtLeastP == nil {
 		return 1
 	} else {
@@ -26,7 +28,7 @@ func (arg Argument) AtLeast() int {
 	}
 }
 
-func (arg Argument) AtMost() int {
+func (arg *Argument) AtMost() int {
 	if arg.AtMostP == nil {
 		return arg.AtLeast()
 	} else {
@@ -39,6 +41,28 @@ type Command struct {
 	Long  string
 	Args  []Argument
 	Run   string
+}
+
+func (cmd *Command) MaxArgLength() int {
+	length := 0
+	for _, arg := range cmd.Args {
+		l := len(arg.Var)
+		if length < l {
+			length = l
+		}
+	}
+	return length
+}
+
+const minArgPadding = 8
+
+func (cmd *Command) ArgPadding() int {
+	padding := cmd.MaxArgLength()
+
+	if padding < minArgPadding {
+		return minArgPadding
+	}
+	return padding
 }
 
 var rootCmd = &cobra.Command{
@@ -176,13 +200,53 @@ func formatUsage(name string, command *Command) string {
 	return usageArgs
 }
 
+func rightPad(s string, padding int) string {
+	template := fmt.Sprintf("%%-%ds", padding)
+	return fmt.Sprintf(template, s)
+}
+
+func argUsages(command *Command) string {
+	usage := ""
+	padding := command.ArgPadding()
+
+	for _, arg := range command.Args {
+		argvar := strings.ToUpper(arg.Var)
+		usage += fmt.Sprintf("  %s %s\n", rightPad(argvar, padding), arg.Short)
+	}
+
+	return usage
+}
+
+func makeUsageFunc(command *Command) func(*cobra.Command) error {
+	bold := color.New(color.Bold)
+
+	return func(cobra *cobra.Command) error {
+		out := cobra.OutOrStderr()
+
+		bold.Fprintf(out, "USAGE\n")
+		fmt.Fprintf(out, "  %s [FLAGS]\n", cobra.UseLine())
+
+		if len(command.Args) > 0 {
+			bold.Fprintf(out, "\nARGUMENTS\n")
+			fmt.Fprintf(out, argUsages(command))
+		}
+
+		if cobra.HasAvailableLocalFlags() {
+			bold.Fprintf(out, "\nFLAGS\n")
+			fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
+		}
+		return nil
+	}
+}
+
 func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 	for name, command := range *config {
-		parentCmd.AddCommand(&cobra.Command{
-			Use:   formatUsage(name, &command),
-			Short: command.Short,
-			Long:  command.Long,
-			Args:  argsMatchDefs(command.Args),
+		cmd := cobra.Command{
+			Use:                   formatUsage(name, &command),
+			Short:                 command.Short,
+			Long:                  command.Long,
+			Args:                  argsMatchDefs(command.Args),
+			DisableFlagsInUseLine: true,
 			Run: func(cmd *cobra.Command, args []string) {
 				env := append(os.Environ(), argEnvVars(command.Args, args)...)
 
@@ -190,7 +254,9 @@ func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 					log.Fatalf("error: %v", err)
 				}
 			},
-		})
+		}
+		cmd.SetUsageFunc(makeUsageFunc(&command))
+		parentCmd.AddCommand(&cmd)
 	}
 }
 

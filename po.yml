@@ -4,4 +4,5 @@ greet:
     An example command that just prints a short message.
   args:
     - var: name
-  run: echo Hello $name $extra
+      short: a name to say hello to
+  run: echo Hello $name
