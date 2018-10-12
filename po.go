@@ -45,11 +45,12 @@ type Flag struct {
 }
 
 type Command struct {
-	Short string
-	Long  string
-	Args  []Argument
-	Flags map[string]Flag
-	Run   string
+	Short    string
+	Long     string
+	Args     []Argument
+	Flags    map[string]Flag
+	Run      string
+	Commands map[string]Command
 }
 
 func (cmd *Command) MaxArgLength() int {
@@ -306,6 +307,11 @@ func makeUsageFunc(command *Command) func(*cobra.Command) error {
 			fmt.Fprintf(out, argUsageText)
 		}
 
+		if rootCmd.HasAvailableSubCommands() {
+			bold.Fprintf(out, "\nCOMMANDS\n")
+			fmt.Fprintf(out, commandUsages(cobra))
+		}
+
 		if cobra.HasAvailableLocalFlags() {
 			bold.Fprintf(out, "\nFLAGS\n")
 			fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
@@ -326,32 +332,53 @@ func buildFlags(cmd *cobra.Command, flags map[string]Flag) error {
 	return nil
 }
 
-func buildCommands(parentCmd *cobra.Command, config *map[string]Command) error {
-	for name, command := range *config {
-		argDefs := command.Args
-		script := command.Run
-		cmd := cobra.Command{
-			Use:                   formatUsage(name, &command),
-			Short:                 command.Short,
-			Long:                  command.Long,
-			Args:                  argsMatchDefs(argDefs),
-			DisableFlagsInUseLine: true,
-			Run: func(cmd *cobra.Command, args []string) {
-				env := os.Environ()
-				env = append(env, argEnvVars(argDefs, args)...)
-				env = append(env, flagEnvVars(cmd.Flags())...)
+func makeRunFunc(command *Command) func(*cobra.Command, []string) {
+	if command.Run == "" {
+		return nil
+	}
 
-				if err := execShell(script, env); err != nil {
-					log.Fatalf("error: %v", err)
-				}
-			},
+	commandArgs := command.Args
+	commandRun := command.Run
+
+	return func(cmd *cobra.Command, args []string) {
+		env := os.Environ()
+		env = append(env, argEnvVars(commandArgs, args)...)
+		env = append(env, flagEnvVars(cmd.Flags())...)
+
+		if err := execShell(commandRun, env); err != nil {
+			log.Fatalf("error: %v", err)
 		}
-		cmd.SetUsageFunc(makeUsageFunc(&command))
+	}
+}
 
-		if err := buildFlags(&cmd, command.Flags); err != nil {
+func buildCommand(parentCmd *cobra.Command, name string, command *Command) error {
+	cmd := cobra.Command{
+		Use:                   formatUsage(name, command),
+		Short:                 command.Short,
+		Long:                  command.Long,
+		Args:                  argsMatchDefs(command.Args),
+		DisableFlagsInUseLine: true,
+		Run:                   makeRunFunc(command),
+	}
+	cmd.SetUsageFunc(makeUsageFunc(command))
+
+	if err := buildFlags(&cmd, command.Flags); err != nil {
+		return err
+	}
+
+	for name, subcommand := range command.Commands {
+		buildCommand(&cmd, name, &subcommand)
+	}
+
+	parentCmd.AddCommand(&cmd)
+	return nil
+}
+
+func buildCommandsFromConfig(parentCmd *cobra.Command, config *map[string]Command) error {
+	for name, command := range *config {
+		if err := buildCommand(parentCmd, name, &command); err != nil {
 			return err
 		}
-		parentCmd.AddCommand(&cmd)
 	}
 	return nil
 }
@@ -366,7 +393,7 @@ func init() {
 		log.Fatalf("error: %v", err)
 	}
 
-	if err := buildCommands(rootCmd, &config); err != nil {
+	if err := buildCommandsFromConfig(rootCmd, &config); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 }

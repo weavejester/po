@@ -16,3 +16,11 @@ bye:
       short: n
       default: World
   run: echo Goodbye $name
+
+group:
+  short: A grouping of commands
+  run: echo Foo
+  commands:
+    subtask:
+      short: A subtask
+      run: echo Subtasking around
