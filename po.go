@@ -285,15 +285,16 @@ func rootUsageFunc(rootCmd *cobra.Command) error {
 	bold.Fprintf(out, "USAGE\n")
 	fmt.Fprintf(out, "  %s [COMMAND] [FLAGS]\n", rootCmd.CommandPath())
 
+	if rootCmd.HasAvailableLocalFlags() {
+		bold.Fprintf(out, "\nOPTIONS\n")
+		fmt.Fprintf(out, rootCmd.LocalFlags().FlagUsages())
+	}
+
 	if rootCmd.HasAvailableSubCommands() {
 		bold.Fprintf(out, "\nCOMMANDS\n")
 		fmt.Fprintf(out, commandUsages(rootCmd))
 	}
 
-	if rootCmd.HasAvailableLocalFlags() {
-		bold.Fprintf(out, "\nFLAGS\n")
-		fmt.Fprintf(out, rootCmd.LocalFlags().FlagUsages())
-	}
 	return nil
 }
 
@@ -339,15 +340,16 @@ func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Comma
 			fmt.Fprintf(out, argUsageText)
 		}
 
+		if cobra.HasAvailableLocalFlags() {
+			bold.Fprintf(out, "\nOPTIONS\n")
+			fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
+		}
+
 		if hasSubCommands(rootCmd, cobra) {
 			bold.Fprintf(out, "\nCOMMANDS\n")
 			fmt.Fprintf(out, subCommandUsages(parentCmd, cobra))
 		}
 
-		if cobra.HasAvailableLocalFlags() {
-			bold.Fprintf(out, "\nFLAGS\n")
-			fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
-		}
 		return nil
 	}
 }
