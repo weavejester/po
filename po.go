@@ -107,22 +107,60 @@ func readConfigFile(path string, config *map[string]Command) error {
 	return nil
 }
 
+func readConfigFileIfExists(path string, config *map[string]Command) error {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return nil
+	}
+
+	if err := readConfigFile(path, config); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func userConfigDir() string {
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return dir
+	} else {
+		return filepath.Join(os.Getenv("HOME"), ".config")
+	}
+}
+
 func isRootPath(path string) bool {
 	return path == filepath.Join(path, "..")
 }
 
+func parentPaths(path string) []string {
+	var parents []string
+
+	for p := path; !isRootPath(p); p = filepath.Join(p, "..") {
+		parents = append(parents, p)
+	}
+
+	return parents
+}
+
 func loadConfig(config *map[string]Command) error {
+	configPath := filepath.Join(userConfigDir(), "po", "po.yml")
+
+	if err := readConfigFileIfExists(configPath, config); err != nil {
+		return err
+	}
+
 	currentDir, err := filepath.Abs(".")
 
 	if err != nil {
 		return err
 	}
 
-	for dir := currentDir; !isRootPath(dir); dir = filepath.Join(dir, "..") {
-		configPath := filepath.Join(dir, configFilename)
+	parentDirs := parentPaths(currentDir)
 
-		if _, err := os.Stat(configPath); err == nil {
-			readConfigFile(configPath, config)
+	for i := len(parentDirs) - 1; i >= 0; i-- {
+		configPath = filepath.Join(parentDirs[i], "po.yml")
+
+		if err := readConfigFileIfExists(configPath, config); err != nil {
+			return err
 		}
 	}
 
