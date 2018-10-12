@@ -19,7 +19,6 @@ bye:
 
 group:
   short: A grouping of commands
-  run: echo Foo
   commands:
     subtask:
       short: A subtask

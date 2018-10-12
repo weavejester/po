@@ -261,12 +261,18 @@ func argUsages(command *Command) string {
 	return usage
 }
 
+func isRootCommand(cmd *cobra.Command) bool {
+	return !strings.Contains(cmd.Name(), ":")
+}
+
 func commandUsages(command *cobra.Command) string {
 	usage := ""
 	padding := command.NamePadding()
 
 	for _, cmd := range command.Commands() {
-		usage += fmt.Sprintf("  %s %s\n", rightPad(cmd.Name(), padding), cmd.Short)
+		if isRootCommand(cmd) {
+			usage += fmt.Sprintf("  %s %s\n", rightPad(cmd.Name(), padding), cmd.Short)
+		}
 	}
 
 	return usage
@@ -291,7 +297,33 @@ func rootUsageFunc(rootCmd *cobra.Command) error {
 	return nil
 }
 
-func makeUsageFunc(command *Command) func(*cobra.Command) error {
+func isSubCommand(parentCmd *cobra.Command, cmd *cobra.Command) bool {
+	return strings.HasPrefix(cmd.Name(), parentCmd.Name()+":")
+}
+
+func hasSubCommands(parentCmd *cobra.Command, cmd *cobra.Command) bool {
+	for _, subCmd := range parentCmd.Commands() {
+		if isSubCommand(cmd, subCmd) {
+			return true
+		}
+	}
+	return false
+}
+
+func subCommandUsages(parentCmd *cobra.Command, cmd *cobra.Command) string {
+	usage := ""
+	padding := parentCmd.NamePadding()
+
+	for _, subCmd := range parentCmd.Commands() {
+		if isSubCommand(cmd, subCmd) {
+			usage += fmt.Sprintf("  %s %s\n", rightPad(subCmd.Name(), padding), subCmd.Short)
+		}
+	}
+
+	return usage
+}
+
+func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Command) error {
 	bold := color.New(color.Bold)
 	args := command.Args
 	argUsageText := argUsages(command)
@@ -307,9 +339,9 @@ func makeUsageFunc(command *Command) func(*cobra.Command) error {
 			fmt.Fprintf(out, argUsageText)
 		}
 
-		if rootCmd.HasAvailableSubCommands() {
+		if hasSubCommands(rootCmd, cobra) {
 			bold.Fprintf(out, "\nCOMMANDS\n")
-			fmt.Fprintf(out, commandUsages(cobra))
+			fmt.Fprintf(out, subCommandUsages(parentCmd, cobra))
 		}
 
 		if cobra.HasAvailableLocalFlags() {
@@ -318,6 +350,18 @@ func makeUsageFunc(command *Command) func(*cobra.Command) error {
 		}
 		return nil
 	}
+}
+
+func helpFunc(cmd *cobra.Command, args []string) {
+	out := cmd.OutOrStderr()
+
+	if cmd.Long != "" {
+		fmt.Fprintf(out, "%s\n\n", cmd.Long)
+	} else {
+		fmt.Fprintf(out, "%s\n\n", cmd.Short)
+	}
+
+	cmd.Usage()
 }
 
 func buildFlags(cmd *cobra.Command, flags map[string]Flag) error {
@@ -360,14 +404,15 @@ func buildCommand(parentCmd *cobra.Command, name string, command *Command) error
 		DisableFlagsInUseLine: true,
 		Run:                   makeRunFunc(command),
 	}
-	cmd.SetUsageFunc(makeUsageFunc(command))
+	cmd.SetUsageFunc(makeUsageFunc(parentCmd, command))
+	cmd.SetHelpFunc(helpFunc)
 
 	if err := buildFlags(&cmd, command.Flags); err != nil {
 		return err
 	}
 
-	for name, subcommand := range command.Commands {
-		buildCommand(&cmd, name, &subcommand)
+	for subname, subcommand := range command.Commands {
+		buildCommand(parentCmd, name+":"+subname, &subcommand)
 	}
 
 	parentCmd.AddCommand(&cmd)
