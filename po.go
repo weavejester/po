@@ -251,6 +251,8 @@ func rootUsageFunc(rootCmd *cobra.Command) error {
 
 func makeUsageFunc(command *Command) func(*cobra.Command) error {
 	bold := color.New(color.Bold)
+	args := command.Args
+	argUsageText := argUsages(command)
 
 	return func(cobra *cobra.Command) error {
 		out := cobra.OutOrStderr()
@@ -258,9 +260,9 @@ func makeUsageFunc(command *Command) func(*cobra.Command) error {
 		bold.Fprintf(out, "USAGE\n")
 		fmt.Fprintf(out, "  %s [FLAGS]\n", cobra.UseLine())
 
-		if len(command.Args) > 0 {
+		if len(args) > 0 {
 			bold.Fprintf(out, "\nARGUMENTS\n")
-			fmt.Fprintf(out, argUsages(command))
+			fmt.Fprintf(out, argUsageText)
 		}
 
 		if cobra.HasAvailableLocalFlags() {
@@ -273,16 +275,18 @@ func makeUsageFunc(command *Command) func(*cobra.Command) error {
 
 func buildCommands(parentCmd *cobra.Command, config *map[string]Command) {
 	for name, command := range *config {
+		argDefs := command.Args
+		script := command.Run
 		cmd := cobra.Command{
 			Use:                   formatUsage(name, &command),
 			Short:                 command.Short,
 			Long:                  command.Long,
-			Args:                  argsMatchDefs(command.Args),
+			Args:                  argsMatchDefs(argDefs),
 			DisableFlagsInUseLine: true,
 			Run: func(cmd *cobra.Command, args []string) {
-				env := append(os.Environ(), argEnvVars(command.Args, args)...)
+				env := append(os.Environ(), argEnvVars(argDefs, args)...)
 
-				if err := execShell(command.Run, env); err != nil {
+				if err := execShell(script, env); err != nil {
 					log.Fatalf("error: %v", err)
 				}
 			},

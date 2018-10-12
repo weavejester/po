@@ -1,8 +1,17 @@
 greet:
-  short: Prints a message.
+  short: Prints a message
   long: |
     An example command that just prints a short message.
   args:
     - var: name
       short: a name to say hello to
   run: echo Hello $name
+
+bye:
+  short: Prints another message
+  args:
+    - var: foo
+      short: a name to say goodbye to
+      at_least: 0
+      at_most: 1
+  run: echo Goodbye $foo
