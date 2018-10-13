@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"gopkg.in/yaml.v2"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -39,11 +40,41 @@ func (arg *Argument) AtMost() int {
 	}
 }
 
+func (a *Argument) Merge(b *Argument) {
+	if b.Var != "" {
+		a.Var = b.Var
+	}
+	if b.Short != "" {
+		a.Short = b.Short
+	}
+	if b.AtLeastP != nil {
+		a.AtLeastP = b.AtLeastP
+	}
+	if b.AtMostP != nil {
+		a.AtMostP = b.AtMostP
+	}
+}
+
 type Flag struct {
 	Desc    string
 	Short   string
 	Type    string
 	Default string
+}
+
+func (a *Flag) Merge(b *Flag) {
+	if b.Desc != "" {
+		a.Desc = b.Desc
+	}
+	if b.Short != "" {
+		a.Short = b.Short
+	}
+	if b.Type != "" {
+		a.Type = b.Type
+	}
+	if b.Default != "" {
+		a.Default = b.Default
+	}
 }
 
 type Command struct {
@@ -77,13 +108,66 @@ func (cmd *Command) ArgPadding() int {
 	return padding
 }
 
+func mergeFlags(a map[string]Flag, b map[string]Flag) {
+	for k, vb := range b {
+		if va, ok := a[k]; ok {
+			va.Merge(&vb)
+		} else {
+			a[k] = vb
+		}
+	}
+}
+
+func mergeCommands(a map[string]Command, b map[string]Command) {
+	for k, vb := range b {
+		if va, ok := a[k]; ok {
+			va.Merge(&vb)
+		} else {
+			a[k] = vb
+		}
+	}
+}
+
+func (a *Command) Merge(b *Command) {
+	if b.Short != "" {
+		a.Short = b.Short
+	}
+	if b.Long != "" {
+		a.Long = b.Long
+	}
+	if b.Run != "" {
+		a.Run = b.Run
+	}
+
+	if len(b.Args) > 0 {
+		a.Args = b.Args
+	}
+
+	mergeFlags(a.Flags, b.Flags)
+	mergeCommands(a.Commands, b.Commands)
+}
+
 type Import struct {
 	File string
 }
 
 type Config struct {
-	Imports []Import
+	Imports  []Import
 	Commands map[string]Command
+}
+
+func (a *Config) Merge(b *Config) {
+	mergeCommands(a.Commands, b.Commands)
+}
+
+func (cfg *Config) MergeAll(otherCfgs []Config) {
+	for _, c := range otherCfgs {
+		cfg.Merge(&c)
+	}
+}
+
+func newConfig() *Config {
+	return &Config{Commands: make(map[string]Command)}
 }
 
 var rootCmd = &cobra.Command{
@@ -100,32 +184,43 @@ var rootCmd = &cobra.Command{
 
 const configFilename = "po.yml"
 
-func readConfigFile(path string, config *Config) error {
-	dat, err := ioutil.ReadFile(path)
+func readConfig(reader io.Reader) (*Config, error) {
+	dat, err := ioutil.ReadAll(reader)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
+
+	var config Config
 
 	err = yaml.Unmarshal(dat, &config)
 
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &config, nil
+
 }
 
-func readConfigFileIfExists(path string, config *Config) error {
+func readConfigFile(path string) (*Config, error) {
+	file, err := os.Open(path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer file.Close()
+
+	return readConfig(file)
+}
+
+func readConfigFileIfExists(path string) (*Config, error) {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return nil
+		return nil, nil
 	}
 
-	if err := readConfigFile(path, config); err != nil {
-		return err
-	}
-
-	return nil
+	return readConfigFile(path)
 }
 
 func userConfigDir() string {
@@ -150,30 +245,61 @@ func parentPaths(path string) []string {
 	return parents
 }
 
-func loadConfig(config *Config) error {
-	configPath := filepath.Join(userConfigDir(), "po", "po.yml")
+func loadUserConfig() (*Config, error) {
+	path := filepath.Join(userConfigDir(), "po", "po.yml")
+	return readConfigFileIfExists(path)
+}
 
-	if err := readConfigFileIfExists(configPath, config); err != nil {
-		return err
-	}
+func loadProjectConfigs() ([]Config, error) {
+	var configs []Config
 
-	currentDir, err := filepath.Abs(".")
+	cwd, err := filepath.Abs(".")
 
 	if err != nil {
-		return err
+		return configs, err
 	}
 
-	parentDirs := parentPaths(currentDir)
+	parentDirs := parentPaths(cwd)
 
-	for i := len(parentDirs) - 1; i >= 0; i-- {
-		configPath = filepath.Join(parentDirs[i], "po.yml")
+	for _, dir := range parentDirs {
+		path := filepath.Join(dir, "po.yml")
 
-		if err := readConfigFileIfExists(configPath, config); err != nil {
-			return err
+		cfg, err := readConfigFileIfExists(path)
+
+		if err != nil {
+			return configs, err
+		}
+
+		if cfg != nil {
+			configs = append(configs, *cfg)
 		}
 	}
 
-	return nil
+	return configs, nil
+}
+
+func loadAllConfigs() ([]Config, error) {
+	var configs []Config
+
+	cfg, err := loadUserConfig()
+
+	if err != nil {
+		return configs, err
+	}
+
+	if cfg != nil {
+		configs = append(configs, *cfg)
+	}
+
+	cfgs, err := loadProjectConfigs()
+
+	if err != nil {
+		return configs, err
+	}
+
+	configs = append(configs, cfgs...)
+
+	return configs, nil
 }
 
 func minArgLength(defs []Argument) int {
@@ -541,16 +667,20 @@ func printError(cmd *cobra.Command, err error) {
 
 func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
+
 	rootCmd.SetUsageFunc(rootUsageFunc)
 
-	var config Config
+	configs, err := loadAllConfigs()
 
-	if err := loadConfig(&config); err != nil {
+	if err != nil {
 		printError(rootCmd, err)
 		os.Exit(2)
 	}
 
-	if err := buildCommandsFromConfig(rootCmd, &config); err != nil {
+	mergedConfig := *newConfig()
+	mergedConfig.MergeAll(configs)
+
+	if err := buildCommandsFromConfig(rootCmd, &mergedConfig); err != nil {
 		printError(rootCmd, err)
 		os.Exit(3)
 	}
