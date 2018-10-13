@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 )
@@ -225,6 +226,10 @@ func flagValueOrDefault(flag *pflag.Flag) string {
 	return flag.DefValue
 }
 
+func isFalseBoolFlag(f *pflag.Flag) bool {
+	return f.Value.Type() == "bool" && f.Value.String() == "false"
+}
+
 func countFlagsWithValues(flags *pflag.FlagSet) int {
 	count := 0
 	visitFlagsWithValues(flags, func(f *pflag.Flag) { count++ })
@@ -236,10 +241,14 @@ func flagEnvVars(flags *pflag.FlagSet) []string {
 	i := 0
 
 	visitFlagsWithValues(flags, func(f *pflag.Flag) {
+		if isFalseBoolFlag(f) {
+			return
+		}
 		env[i] = fmt.Sprintf("%s=%s", f.Name, flagValueOrDefault(f))
+		i++
 	})
 
-	return env
+	return env[:i]
 }
 
 func argsMatchDefs(defs []Argument) cobra.PositionalArgs {
@@ -430,11 +439,31 @@ func helpFunc(cmd *cobra.Command, args []string) {
 	cmd.Usage()
 }
 
+func parseInt(s string) int {
+	if n, err := strconv.Atoi(s); err == nil {
+		return n
+	} else {
+		return 0
+	}
+}
+
+func parseBool(s string) bool {
+	if b, err := strconv.ParseBool(s); err == nil {
+		return b
+	} else {
+		return false
+	}
+}
+
 func buildFlags(cmd *cobra.Command, flags map[string]Flag) error {
 	for name, flag := range flags {
 		switch flag.Type {
 		case "string":
 			cmd.Flags().StringP(name, flag.Short, flag.Default, flag.Desc)
+		case "int":
+			cmd.Flags().IntP(name, flag.Short, parseInt(flag.Default), flag.Desc)
+		case "bool":
+			cmd.Flags().BoolP(name, flag.Short, parseBool(flag.Default), flag.Desc)
 		default:
 			return fmt.Errorf("no such type: %v", flag.Type)
 		}

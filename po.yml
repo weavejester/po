@@ -17,6 +17,17 @@ bye:
       default: World
   run: echo Goodbye $name
 
+flagger:
+  short: Flag test
+  flags:
+    foo:
+      desc: bool flag
+      type: bool
+    bar:
+      desc: int flag
+      type: int
+  run: echo foo=$foo bar=$bar
+
 group:
   short: A grouping of commands
   commands:
