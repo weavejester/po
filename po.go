@@ -77,7 +77,12 @@ func (cmd *Command) ArgPadding() int {
 	return padding
 }
 
+type Import struct {
+	File string
+}
+
 type Config struct {
+	Imports []Import
 	Commands map[string]Command
 }
 

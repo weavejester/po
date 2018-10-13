@@ -1,3 +1,5 @@
+imports:
+  - file: import.yml
 commands:
   greet:
     short: Prints a message
