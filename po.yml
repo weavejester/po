@@ -1,36 +1,37 @@
-greet:
-  short: Prints a message
-  long: |
-    An example command that just prints a short message.
-  args:
-    - var: name
-      short: a name to say hello to
-  run: echo Hello $name
+commands:
+  greet:
+    short: Prints a message
+    long: |
+      An example command that just prints a short message.
+    args:
+      - var: name
+        short: a name to say hello to
+    run: echo Hello $name
 
-bye:
-  short: Prints another message
-  flags:
-    name:
-      desc: a name to say goodbye to
-      type: string
-      short: n
-      default: World
-  run: echo Goodbye $name
+  bye:
+    short: Prints another message
+    flags:
+      name:
+        desc: a name to say goodbye to
+        type: string
+        short: n
+        default: World
+    run: echo Goodbye $name
 
-flagger:
-  short: Flag test
-  flags:
-    foo:
-      desc: bool flag
-      type: bool
-    bar:
-      desc: int flag
-      type: int
-  run: echo foo=$foo bar=$bar
+  flagger:
+    short: Flag test
+    flags:
+      foo:
+        desc: bool flag
+        type: bool
+      bar:
+        desc: int flag
+        type: int
+    run: echo foo=$foo bar=$bar
 
-group:
-  short: A grouping of commands
-  commands:
-    subtask:
-      short: A subtask
-      run: echo Subtasking around
+  group:
+    short: A grouping of commands
+    commands:
+      subtask:
+        short: A subtask
+        run: echo Subtasking around

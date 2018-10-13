@@ -77,6 +77,10 @@ func (cmd *Command) ArgPadding() int {
 	return padding
 }
 
+type Config struct {
+	Commands map[string]Command
+}
+
 var rootCmd = &cobra.Command{
 	Use:           "po",
 	Short:         "CLI for managing project-specific scripts",
@@ -91,7 +95,7 @@ var rootCmd = &cobra.Command{
 
 const configFilename = "po.yml"
 
-func readConfigFile(path string, config *map[string]Command) error {
+func readConfigFile(path string, config *Config) error {
 	dat, err := ioutil.ReadFile(path)
 
 	if err != nil {
@@ -107,7 +111,7 @@ func readConfigFile(path string, config *map[string]Command) error {
 	return nil
 }
 
-func readConfigFileIfExists(path string, config *map[string]Command) error {
+func readConfigFileIfExists(path string, config *Config) error {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		return nil
 	}
@@ -141,7 +145,7 @@ func parentPaths(path string) []string {
 	return parents
 }
 
-func loadConfig(config *map[string]Command) error {
+func loadConfig(config *Config) error {
 	configPath := filepath.Join(userConfigDir(), "po", "po.yml")
 
 	if err := readConfigFileIfExists(configPath, config); err != nil {
@@ -514,8 +518,8 @@ func buildCommand(parentCmd *cobra.Command, name string, command *Command) error
 	return nil
 }
 
-func buildCommandsFromConfig(parentCmd *cobra.Command, config *map[string]Command) error {
-	for name, command := range *config {
+func buildCommandsFromConfig(parentCmd *cobra.Command, config *Config) error {
+	for name, command := range config.Commands {
 		if err := buildCommand(parentCmd, name, &command); err != nil {
 			return err
 		}
@@ -534,7 +538,7 @@ func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 	rootCmd.SetUsageFunc(rootUsageFunc)
 
-	config := make(map[string]Command)
+	var config Config
 
 	if err := loadConfig(&config); err != nil {
 		printError(rootCmd, err)
