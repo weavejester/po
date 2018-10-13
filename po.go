@@ -78,8 +78,7 @@ func (cmd *Command) ArgPadding() int {
 
 var rootCmd = &cobra.Command{
 	Use:           "po",
-	Short:         "FIXME",
-	Long:          "FIXME",
+	Short:         "CLI for managing project-specific scripts",
 	Version:       "0.0.1",
 	SilenceUsage:  true,
 	SilenceErrors: true,
@@ -423,9 +422,9 @@ func helpFunc(cmd *cobra.Command, args []string) {
 	out := cmd.OutOrStderr()
 
 	if cmd.Long != "" {
-		fmt.Fprintf(out, "%s\n\n", cmd.Long)
+		fmt.Fprintf(out, "%s\n\n", strings.Trim(cmd.Long, "\n"))
 	} else {
-		fmt.Fprintf(out, "%s\n\n", cmd.Short)
+		fmt.Fprintf(out, "%s\n\n", strings.Trim(cmd.Short, "\n"))
 	}
 
 	cmd.Usage()
