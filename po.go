@@ -327,13 +327,11 @@ func readUserConfig() (*Config, error) {
 	return readConfigFileIfExists(path)
 }
 
-func readProjectConfigs() ([]Config, error) {
-	var configs []Config
-
+func readProjectConfig() (*Config, error) {
 	cwd, err := filepath.Abs(".")
 
 	if err != nil {
-		return configs, err
+		return nil, err
 	}
 
 	parentDirs := parentPaths(cwd)
@@ -341,18 +339,18 @@ func readProjectConfigs() ([]Config, error) {
 	for _, dir := range parentDirs {
 		path := filepath.Join(dir, "po.yml")
 
-		cfg, err := readConfigFileIfExists(path)
+		config, err := readConfigFileIfExists(path)
 
 		if err != nil {
-			return configs, err
+			return config, err
 		}
 
-		if cfg != nil {
-			configs = append(configs, *cfg)
+		if config != nil {
+			return config, nil
 		}
 	}
 
-	return configs, nil
+	return nil, nil
 }
 
 func readAllConfigs() ([]Config, error) {
@@ -368,13 +366,13 @@ func readAllConfigs() ([]Config, error) {
 		configs = append(configs, *cfg)
 	}
 
-	cfgs, err := readProjectConfigs()
+	cfg, err = readProjectConfig()
 
 	if err != nil {
 		return configs, err
 	}
 
-	configs = append(configs, cfgs...)
+	configs = append(configs, *cfg)
 
 	return configs, nil
 }
@@ -740,7 +738,7 @@ func makeRunFunc(command *Command) func(*cobra.Command, []string) {
 	}
 }
 
-func buildCommand(parentCmd *cobra.Command, name string, command *Command) error {
+func buildCommand(parentCmd *cobra.Command, name string, command *Command) (*cobra.Command, error) {
 	cmd := cobra.Command{
 		Use:                   formatUsage(name, command),
 		Short:                 command.Short,
@@ -753,23 +751,84 @@ func buildCommand(parentCmd *cobra.Command, name string, command *Command) error
 	cmd.SetHelpFunc(helpFunc)
 
 	if err := buildFlags(&cmd, command.Flags); err != nil {
-		return err
+		return &cmd, err
 	}
 
 	for subname, subcommand := range command.Commands {
-		buildCommand(parentCmd, name+":"+subname, &subcommand)
+		_, err := buildCommand(parentCmd, name+":"+subname, &subcommand)
+
+		if err != nil {
+			return &cmd, err
+		}
 	}
 
 	parentCmd.AddCommand(&cmd)
-	return nil
+	return &cmd, nil
 }
 
 func buildCommandsFromConfig(parentCmd *cobra.Command, config *Config) error {
 	for name, command := range config.Commands {
-		if err := buildCommand(parentCmd, name, &command); err != nil {
+		_, err := buildCommand(parentCmd, name, &command)
+
+		if err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func deleteFilesInDir(dir string) error {
+	files, err := ioutil.ReadDir(dir)
+
+	if err != nil {
+		return err
+	}
+
+	for _, file := range files {
+		os.Remove(filepath.Join(dir, file.Name()))
+	}
+
+	return nil
+}
+
+func deleteCacheFiles() error {
+	userCacheDir, err := os.UserCacheDir()
+
+	if err != nil {
+		return err
+	}
+
+	cacheDir := filepath.Join(userCacheDir, "po")
+
+	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+		return nil
+	}
+
+	return deleteFilesInDir(cacheDir)
+}
+
+func addInbuiltCommands(parentCmd *cobra.Command) error {
+	_, err := buildCommand(parentCmd, "po", &Command{
+		Short: "Inbuilt commands",
+	})
+
+	if err != nil {
+		return err
+	}
+
+	refreshCmd, err := buildCommand(parentCmd, "po:refresh", &Command{
+		Short: "Refresh import cache",
+	})
+
+	if err != nil {
+		return err
+	}
+
+	refreshCmd.Run = func(cmd *cobra.Command, args []string) {
+		deleteCacheFiles()
+		os.Exit(0)
+	}
+
 	return nil
 }
 
@@ -784,6 +843,7 @@ func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 
 	rootCmd.SetUsageFunc(rootUsageFunc)
+	addInbuiltCommands(rootCmd)
 
 	configs, err := loadAllConfigs()
 
