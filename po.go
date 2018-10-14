@@ -245,12 +245,12 @@ func parentPaths(path string) []string {
 	return parents
 }
 
-func loadUserConfig() (*Config, error) {
+func readUserConfig() (*Config, error) {
 	path := filepath.Join(userConfigDir(), "po", "po.yml")
 	return readConfigFileIfExists(path)
 }
 
-func loadProjectConfigs() ([]Config, error) {
+func readProjectConfigs() ([]Config, error) {
 	var configs []Config
 
 	cwd, err := filepath.Abs(".")
@@ -278,10 +278,10 @@ func loadProjectConfigs() ([]Config, error) {
 	return configs, nil
 }
 
-func loadAllConfigs() ([]Config, error) {
+func readAllConfigs() ([]Config, error) {
 	var configs []Config
 
-	cfg, err := loadUserConfig()
+	cfg, err := readUserConfig()
 
 	if err != nil {
 		return configs, err
@@ -291,13 +291,47 @@ func loadAllConfigs() ([]Config, error) {
 		configs = append(configs, *cfg)
 	}
 
-	cfgs, err := loadProjectConfigs()
+	cfgs, err := readProjectConfigs()
 
 	if err != nil {
 		return configs, err
 	}
 
 	configs = append(configs, cfgs...)
+
+	return configs, nil
+}
+
+func readImport(imp Import) (*Config, error) {
+	return readConfigFile(imp.File)
+}
+
+func loadAndMergeImports(config *Config) error {
+	for _, imp := range config.Imports {
+		importedCfg, err := readImport(imp)
+
+		if err != nil {
+			return err
+		}
+
+		config.Merge(importedCfg)
+	}
+	
+	return nil
+}
+
+func loadAllConfigs() ([]Config, error) {
+	configs, err := readAllConfigs()
+
+	if err != nil {
+		return configs, err
+	}
+
+	for _, cfg := range configs {
+		if err := loadAndMergeImports(&cfg); err != nil {
+			return configs, err
+		}
+	}
 
 	return configs, nil
 }

@@ -1,0 +1,8 @@
+commands:
+  imported:
+    short: Imported command
+    run: echo imported
+
+  greet:
+    short: Imported greet
+    run: echo imported greet
