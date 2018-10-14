@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha1"
 	"fmt"
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -186,6 +187,16 @@ var rootCmd = &cobra.Command{
 
 const configFilename = "po.yml"
 
+func parseConfig(dat []byte) (*Config, error) {
+	var config Config
+
+	if err := yaml.Unmarshal(dat, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
 func readConfig(reader io.Reader) (*Config, error) {
 	dat, err := ioutil.ReadAll(reader)
 
@@ -193,16 +204,7 @@ func readConfig(reader io.Reader) (*Config, error) {
 		return nil, err
 	}
 
-	var config Config
-
-	err = yaml.Unmarshal(dat, &config)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &config, nil
-
+	return parseConfig(dat)
 }
 
 func readConfigFile(path string) (*Config, error) {
@@ -225,7 +227,58 @@ func readConfigFileIfExists(path string) (*Config, error) {
 	return readConfigFile(path)
 }
 
+func urlCacheFilename(url string) string {
+	h := sha1.New()
+	h.Write([]byte(url))
+
+	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func readUrlCache(url string) ([]byte, error) {
+	userCacheDir, err := os.UserCacheDir()
+
+	if err != nil {
+		return nil, err
+	}
+
+	cachePath := filepath.Join(userCacheDir, "po", urlCacheFilename(url))
+
+	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	return ioutil.ReadFile(cachePath)
+}
+
+func writeUrlCache(url string, dat []byte) error {
+	userCacheDir, err := os.UserCacheDir()
+
+	if err != nil {
+		return err
+	}
+
+	cacheDir := filepath.Join(userCacheDir, "po")
+
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return err
+	}
+
+	path := filepath.Join(cacheDir, urlCacheFilename(url))
+
+	return ioutil.WriteFile(path, dat, 0644)
+}
+
 func readConfigUrl(url string) (*Config, error) {
+	dat, err := readUrlCache(url)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if dat != nil {
+		return parseConfig(dat)
+	}
+
 	resp, err := http.Get(url)
 
 	if err != nil {
@@ -234,7 +287,17 @@ func readConfigUrl(url string) (*Config, error) {
 
 	defer resp.Body.Close()
 
-	return readConfig(resp.Body)
+	dat, err = ioutil.ReadAll(resp.Body)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := writeUrlCache(url, dat); err != nil {
+		return nil, err
+	}
+
+	return parseConfig(dat)
 }
 
 func userConfigDir() string {
