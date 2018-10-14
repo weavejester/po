@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -149,6 +150,7 @@ func (a *Command) Merge(b *Command) {
 
 type Import struct {
 	File string
+	Url  string
 }
 
 type Config struct {
@@ -221,6 +223,18 @@ func readConfigFileIfExists(path string) (*Config, error) {
 	}
 
 	return readConfigFile(path)
+}
+
+func readConfigUrl(url string) (*Config, error) {
+	resp, err := http.Get(url)
+
+	if err != nil {
+		return nil, err
+	}
+
+	defer resp.Body.Close()
+
+	return readConfig(resp.Body)
 }
 
 func userConfigDir() string {
@@ -303,7 +317,11 @@ func readAllConfigs() ([]Config, error) {
 }
 
 func readImport(imp Import) (*Config, error) {
-	return readConfigFile(imp.File)
+	if imp.File != "" {
+		return readConfigFile(imp.File)
+	} else {
+		return readConfigUrl(imp.Url)
+	}
 }
 
 func loadAndMergeImports(config *Config) error {
@@ -316,7 +334,7 @@ func loadAndMergeImports(config *Config) error {
 
 		config.Merge(importedCfg)
 	}
-	
+
 	return nil
 }
 
