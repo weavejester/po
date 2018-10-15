@@ -711,26 +711,30 @@ func subCommandUsages(parentCmd *cobra.Command, cmd *cobra.Command) string {
 func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Command) error {
 	bold := color.New(color.Bold)
 	args := command.Args
+	run := command.Run
 	argUsageText := argUsages(command)
 
 	return func(cobra *cobra.Command) error {
 		out := cobra.OutOrStderr()
 
-		bold.Fprintf(out, "USAGE\n")
-		fmt.Fprintf(out, "  %s [FLAGS]\n", cobra.UseLine())
+		if run != "" {
+			bold.Fprintf(out, "USAGE\n")
+			fmt.Fprintf(out, "  %s [FLAGS]\n", cobra.UseLine())
 
-		if len(args) > 0 {
-			bold.Fprintf(out, "\nARGUMENTS\n")
-			fmt.Fprintf(out, argUsageText)
-		}
+			if len(args) > 0 {
+				bold.Fprintf(out, "\nARGUMENTS\n")
+				fmt.Fprintf(out, argUsageText)
+			}
 
-		if cobra.HasAvailableLocalFlags() {
-			bold.Fprintf(out, "\nFLAGS\n")
-			fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
+			if cobra.HasAvailableLocalFlags() {
+				bold.Fprintf(out, "\nFLAGS\n")
+				fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
+			}
+			fmt.Println()
 		}
 
 		if hasSubCommands(rootCmd, cobra) {
-			bold.Fprintf(out, "\nCOMMANDS\n")
+			bold.Fprintf(out, "COMMANDS\n")
 			fmt.Fprintf(out, subCommandUsages(parentCmd, cobra))
 		}
 
@@ -875,7 +879,7 @@ func deleteCacheFiles() error {
 
 func addInbuiltCommands(config *Config, parentCmd *cobra.Command) error {
 	_, err := buildCommand(config, parentCmd, "po", &Command{
-		Short: "Inbuilt commands",
+		Short: "Built-in commands",
 	})
 
 	if err != nil {
