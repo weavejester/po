@@ -639,7 +639,7 @@ func rootUsageFunc(rootCmd *cobra.Command) error {
 	fmt.Fprintf(out, "  %s [COMMAND] [FLAGS]\n", rootCmd.CommandPath())
 
 	if rootCmd.HasAvailableLocalFlags() {
-		bold.Fprintf(out, "\nOPTIONS\n")
+		bold.Fprintf(out, "\nFLAGS\n")
 		fmt.Fprintf(out, rootCmd.LocalFlags().FlagUsages())
 	}
 
@@ -696,7 +696,7 @@ func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Comma
 		}
 
 		if cobra.HasAvailableLocalFlags() {
-			bold.Fprintf(out, "\nOPTIONS\n")
+			bold.Fprintf(out, "\nFLAGS\n")
 			fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
 		}
 
