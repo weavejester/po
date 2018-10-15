@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -328,26 +329,71 @@ func findProjectConfig() (string, error) {
 	return "", nil
 }
 
-func readImport(imp Import, root string) (*Config, error) {
+func findImportPath(importPath string, parents []Import) string {
+	lastParent := parents[len(parents)-1]
+
+	if lastParent.File == "" || path.IsAbs(importPath) {
+		return importPath
+	} else {
+		return filepath.Join(filepath.Dir(lastParent.File), importPath)
+	}
+}
+
+func readImport(imp Import, parents []Import) (*Config, error) {
 	if imp.File != "" {
-		return readConfigFile(filepath.Join(filepath.Dir(root), imp.File))
+		return readConfigFile(findImportPath(imp.File, parents))
 	} else {
 		return readConfigUrl(imp.Url)
 	}
 }
 
-func loadAndMergeImports(config *Config, root string) error {
+func hasImport(haystack []Import, needle Import) bool {
+	for _, imp := range haystack {
+		if imp == needle {
+			return true
+		}
+	}
+	return false
+}
+
+func loadImports(config *Config, parents []Import) error {
+	lastParent := parents[len(parents)-1]
+
 	for _, imp := range config.Imports {
-		importedCfg, err := readImport(imp, root)
+		if imp.File != "" && imp.Url != "" {
+			return fmt.Errorf("cannot have an import with a file and a URL set")
+		}
+
+		if hasImport(parents, imp) {
+			return fmt.Errorf("cyclic dependency in imports")
+		}
+
+		if imp.File != "" && lastParent.Url != "" {
+			return fmt.Errorf("cannot load a file import referenced from a URL")
+		}
+
+		importedCfg, err := readImport(imp, parents)
 
 		if err != nil {
 			return err
 		}
 
+		parents = append(parents, imp)
+
+		if err := loadImports(importedCfg, parents); err != nil {
+			return err
+		}
+
+		parents = parents[:len(parents)-1]
+
 		config.Merge(importedCfg)
 	}
 
 	return nil
+}
+
+func loadRootImports(config *Config, path string) error {
+	return loadImports(config, []Import{Import{File: path}})
 }
 
 const projectRootEnvVar = "PO_PROJECT_ROOT"
@@ -361,7 +407,7 @@ func loadAllConfigs() (*Config, error) {
 	}
 
 	if userCfg != nil {
-		if err := loadAndMergeImports(userCfg, userCfgPath); err != nil {
+		if err := loadRootImports(userCfg, userCfgPath); err != nil {
 			return nil, err
 		}
 	}
@@ -385,7 +431,7 @@ func loadAllConfigs() (*Config, error) {
 	}
 
 	if projectCfg != nil {
-		if err := loadAndMergeImports(projectCfg, projectCfgPath); err != nil {
+		if err := loadRootImports(projectCfg, projectCfgPath); err != nil {
 			return nil, err
 		}
 	}

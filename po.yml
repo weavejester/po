@@ -1,6 +1,5 @@
 imports:
   - file: import.yml
-  - url: https://gist.githubusercontent.com/weavejester/a0ae9d320b314df199719fb9fa8c6c2f/raw/80fe1929648c797b9bf717c4b7f9110c3aa7d094/import.yml
 commands:
   greet:
     short: Prints a message
