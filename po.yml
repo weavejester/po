@@ -21,6 +21,12 @@ commands:
         default: World
     run: echo Goodbye $name
 
+  projectdir:
+    short: Tests project directory
+    run: |
+      echo $PWD
+      echo $PO_PROJECT_ROOT
+
   flagger:
     short: Flag test
     flags:

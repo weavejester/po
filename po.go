@@ -160,17 +160,11 @@ type Config struct {
 }
 
 func (a *Config) Merge(b *Config) {
-	mergeCommands(a.Commands, b.Commands)
-}
-
-func (cfg *Config) MergeAll(otherCfgs []Config) {
-	for _, c := range otherCfgs {
-		cfg.Merge(&c)
+	if a.Commands == nil {
+		a.Commands = b.Commands
+	} else if b.Commands != nil {
+		mergeCommands(a.Commands, b.Commands)
 	}
-}
-
-func newConfig() *Config {
-	return &Config{Commands: make(map[string]Command)}
 }
 
 var rootCmd = &cobra.Command{
@@ -184,8 +178,6 @@ var rootCmd = &cobra.Command{
 		os.Exit(0)
 	},
 }
-
-const configFilename = "po.yml"
 
 func parseConfig(dat []byte) (*Config, error) {
 	var config Config
@@ -308,73 +300,33 @@ func userConfigDir() string {
 	}
 }
 
+const configFileName = "po.yml"
+
+func readUserConfig() (*Config, error) {
+	path := filepath.Join(userConfigDir(), "po", configFileName)
+	return readConfigFileIfExists(path)
+}
+
 func isRootPath(path string) bool {
 	return path == filepath.Join(path, "..")
 }
 
-func parentPaths(path string) []string {
-	var parents []string
-
-	for p := path; !isRootPath(p); p = filepath.Join(p, "..") {
-		parents = append(parents, p)
-	}
-
-	return parents
-}
-
-func readUserConfig() (*Config, error) {
-	path := filepath.Join(userConfigDir(), "po", "po.yml")
-	return readConfigFileIfExists(path)
-}
-
-func readProjectConfig() (*Config, error) {
+func findProjectConfig() (string, error) {
 	cwd, err := filepath.Abs(".")
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	parentDirs := parentPaths(cwd)
+	for path := cwd; !isRootPath(path); path = filepath.Join(path, "..") {
+		configPath := filepath.Join(path, configFileName)
 
-	for _, dir := range parentDirs {
-		path := filepath.Join(dir, "po.yml")
-
-		config, err := readConfigFileIfExists(path)
-
-		if err != nil {
-			return config, err
-		}
-
-		if config != nil {
-			return config, nil
+		if _, err := os.Stat(configPath); !os.IsNotExist(err) {
+			return configPath, nil
 		}
 	}
 
-	return nil, nil
-}
-
-func readAllConfigs() ([]Config, error) {
-	var configs []Config
-
-	cfg, err := readUserConfig()
-
-	if err != nil {
-		return configs, err
-	}
-
-	if cfg != nil {
-		configs = append(configs, *cfg)
-	}
-
-	cfg, err = readProjectConfig()
-
-	if err != nil {
-		return configs, err
-	}
-
-	configs = append(configs, *cfg)
-
-	return configs, nil
+	return "", nil
 }
 
 func readImport(imp Import) (*Config, error) {
@@ -399,20 +351,56 @@ func loadAndMergeImports(config *Config) error {
 	return nil
 }
 
-func loadAllConfigs() ([]Config, error) {
-	configs, err := readAllConfigs()
+const projectRootEnvVar = "PO_PROJECT_ROOT"
+
+func loadAllConfigs() (*Config, error) {
+	userConfig, err := readUserConfig()
 
 	if err != nil {
-		return configs, err
+		return nil, err
 	}
 
-	for _, cfg := range configs {
-		if err := loadAndMergeImports(&cfg); err != nil {
-			return configs, err
+	if userConfig != nil {
+		if err := loadAndMergeImports(userConfig); err != nil {
+			return nil, err
 		}
 	}
 
-	return configs, nil
+	projectConfigPath, err := findProjectConfig()
+
+	if err != nil {
+		return nil, err
+	}
+
+	os.Setenv(projectRootEnvVar, filepath.Dir(projectConfigPath))
+
+	var projectConfig *Config
+
+	if projectConfigPath != "" {
+		projectConfig, err = readConfigFileIfExists(projectConfigPath)
+
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if projectConfig != nil {
+		if err := loadAndMergeImports(projectConfig); err != nil {
+			return nil, err
+		}
+	}
+
+	switch {
+	case userConfig == nil && projectConfig == nil:
+		return nil, nil
+	case userConfig == nil:
+		return projectConfig, nil
+	case projectConfig == nil:
+		return userConfig, nil
+	default:
+		userConfig.Merge(projectConfig)
+		return userConfig, nil
+	}
 }
 
 func minArgLength(defs []Argument) int {
@@ -845,19 +833,18 @@ func init() {
 	rootCmd.SetUsageFunc(rootUsageFunc)
 	addInbuiltCommands(rootCmd)
 
-	configs, err := loadAllConfigs()
+	config, err := loadAllConfigs()
 
 	if err != nil {
 		printError(rootCmd, err)
 		os.Exit(2)
 	}
 
-	mergedConfig := *newConfig()
-	mergedConfig.MergeAll(configs)
-
-	if err := buildCommandsFromConfig(rootCmd, &mergedConfig); err != nil {
-		printError(rootCmd, err)
-		os.Exit(3)
+	if config != nil {
+		if err := buildCommandsFromConfig(rootCmd, config); err != nil {
+			printError(rootCmd, err)
+			os.Exit(3)
+		}
 	}
 }
 
