@@ -155,8 +155,15 @@ type Import struct {
 	Url  string
 }
 
+func mergeVars(a map[string]string, b map[string]string) {
+	for k, vb := range b {
+		a[k] = vb
+	}
+}
+
 type Config struct {
 	Imports  []Import
+	Vars     map[string]string
 	Commands map[string]Command
 }
 
@@ -165,6 +172,12 @@ func (a *Config) Merge(b *Config) {
 		a.Commands = b.Commands
 	} else if b.Commands != nil {
 		mergeCommands(a.Commands, b.Commands)
+	}
+
+	if a.Vars == nil {
+		a.Vars = b.Vars
+	} else if b.Vars != nil {
+		mergeVars(a.Vars, b.Vars)
 	}
 }
 
@@ -533,6 +546,22 @@ func flagEnvVars(flags *pflag.FlagSet) []string {
 	return env[:i]
 }
 
+func configEnvVars(config *Config) []string {
+	if config.Vars == nil {
+		return []string{}
+	}
+
+	env := make([]string, len(config.Vars))
+	i := 0
+
+	for k, v := range config.Vars {
+		env[i] = fmt.Sprintf("%s=%s", k, v)
+		i++
+	}
+
+	return env
+}
+
 func argsMatchDefs(defs []Argument) cobra.PositionalArgs {
 	minLength := minArgLength(defs)
 	maxLength := maxArgLength(defs)
@@ -753,16 +782,19 @@ func buildFlags(cmd *cobra.Command, flags map[string]Flag) error {
 	return nil
 }
 
-func makeRunFunc(command *Command) func(*cobra.Command, []string) {
+func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string) {
 	if command.Run == "" {
 		return nil
 	}
+
+	configEnv := configEnvVars(config)
 
 	commandArgs := command.Args
 	commandRun := command.Run
 
 	return func(cmd *cobra.Command, args []string) {
 		env := os.Environ()
+		env = append(env, configEnv...)
 		env = append(env, argEnvVars(commandArgs, args)...)
 		env = append(env, flagEnvVars(cmd.Flags())...)
 
@@ -772,14 +804,14 @@ func makeRunFunc(command *Command) func(*cobra.Command, []string) {
 	}
 }
 
-func buildCommand(parentCmd *cobra.Command, name string, command *Command) (*cobra.Command, error) {
+func buildCommand(config *Config, parentCmd *cobra.Command, name string, command *Command) (*cobra.Command, error) {
 	cmd := cobra.Command{
 		Use:                   formatUsage(name, command),
 		Short:                 command.Short,
 		Long:                  command.Long,
 		Args:                  argsMatchDefs(command.Args),
 		DisableFlagsInUseLine: true,
-		Run:                   makeRunFunc(command),
+		Run:                   makeRunFunc(config, command),
 	}
 	cmd.SetUsageFunc(makeUsageFunc(parentCmd, command))
 	cmd.SetHelpFunc(helpFunc)
@@ -789,7 +821,7 @@ func buildCommand(parentCmd *cobra.Command, name string, command *Command) (*cob
 	}
 
 	for subname, subcommand := range command.Commands {
-		_, err := buildCommand(parentCmd, name+":"+subname, &subcommand)
+		_, err := buildCommand(config, parentCmd, name+":"+subname, &subcommand)
 
 		if err != nil {
 			return &cmd, err
@@ -800,9 +832,9 @@ func buildCommand(parentCmd *cobra.Command, name string, command *Command) (*cob
 	return &cmd, nil
 }
 
-func buildCommandsFromConfig(parentCmd *cobra.Command, config *Config) error {
+func buildCommandsFromConfig(config *Config, parentCmd *cobra.Command) error {
 	for name, command := range config.Commands {
-		_, err := buildCommand(parentCmd, name, &command)
+		_, err := buildCommand(config, parentCmd, name, &command)
 
 		if err != nil {
 			return err
@@ -841,8 +873,8 @@ func deleteCacheFiles() error {
 	return deleteFilesInDir(cacheDir)
 }
 
-func addInbuiltCommands(parentCmd *cobra.Command) error {
-	_, err := buildCommand(parentCmd, "po", &Command{
+func addInbuiltCommands(config *Config, parentCmd *cobra.Command) error {
+	_, err := buildCommand(config, parentCmd, "po", &Command{
 		Short: "Inbuilt commands",
 	})
 
@@ -850,7 +882,7 @@ func addInbuiltCommands(parentCmd *cobra.Command) error {
 		return err
 	}
 
-	refreshCmd, err := buildCommand(parentCmd, "po:refresh", &Command{
+	refreshCmd, err := buildCommand(config, parentCmd, "po:refresh", &Command{
 		Short: "Refresh import cache",
 	})
 
@@ -877,7 +909,6 @@ func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 
 	rootCmd.SetUsageFunc(rootUsageFunc)
-	addInbuiltCommands(rootCmd)
 
 	config, err := loadAllConfigs()
 
@@ -886,11 +917,18 @@ func init() {
 		os.Exit(2)
 	}
 
-	if config != nil {
-		if err := buildCommandsFromConfig(rootCmd, config); err != nil {
-			printError(rootCmd, err)
-			os.Exit(3)
-		}
+	if config == nil {
+		config = &Config{}
+	}
+
+	if err := addInbuiltCommands(config, rootCmd); err != nil {
+		printError(rootCmd, err)
+		os.Exit(3)
+	}
+
+	if err := buildCommandsFromConfig(config, rootCmd); err != nil {
+		printError(rootCmd, err)
+		os.Exit(4)
 	}
 }
 

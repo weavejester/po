@@ -1,5 +1,8 @@
 imports:
   - file: import.yml
+vars:
+  aaa: hello
+  bbb: world
 commands:
   greet:
     short: Prints a message
@@ -20,11 +23,13 @@ commands:
         default: World
     run: echo Goodbye $name
 
-  projectdir:
-    short: Tests project directory
+  envvars:
+    short: Tests environment vars
     run: |
-      echo $PWD
-      echo $PO_PROJECT_ROOT
+      echo PWD=$PWD
+      echo PO_PROJECT_ROOT=$PO_PROJECT_ROOT
+      echo aaa=$aaa
+      echo bbb=$bbb
 
   flagger:
     short: Flag test
