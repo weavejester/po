@@ -302,9 +302,8 @@ func userConfigDir() string {
 
 const configFileName = "po.yml"
 
-func readUserConfig() (*Config, error) {
-	path := filepath.Join(userConfigDir(), "po", configFileName)
-	return readConfigFileIfExists(path)
+func userConfigPath() string {
+	return filepath.Join(userConfigDir(), "po", configFileName)
 }
 
 func isRootPath(path string) bool {
@@ -329,17 +328,17 @@ func findProjectConfig() (string, error) {
 	return "", nil
 }
 
-func readImport(imp Import) (*Config, error) {
+func readImport(imp Import, root string) (*Config, error) {
 	if imp.File != "" {
-		return readConfigFile(imp.File)
+		return readConfigFile(filepath.Join(filepath.Dir(root), imp.File))
 	} else {
 		return readConfigUrl(imp.Url)
 	}
 }
 
-func loadAndMergeImports(config *Config) error {
+func loadAndMergeImports(config *Config, root string) error {
 	for _, imp := range config.Imports {
-		importedCfg, err := readImport(imp)
+		importedCfg, err := readImport(imp, root)
 
 		if err != nil {
 			return err
@@ -354,52 +353,53 @@ func loadAndMergeImports(config *Config) error {
 const projectRootEnvVar = "PO_PROJECT_ROOT"
 
 func loadAllConfigs() (*Config, error) {
-	userConfig, err := readUserConfig()
+	userCfgPath := userConfigPath()
+	userCfg, err := readConfigFile(userCfgPath)
 
 	if err != nil {
 		return nil, err
 	}
 
-	if userConfig != nil {
-		if err := loadAndMergeImports(userConfig); err != nil {
+	if userCfg != nil {
+		if err := loadAndMergeImports(userCfg, userCfgPath); err != nil {
 			return nil, err
 		}
 	}
 
-	projectConfigPath, err := findProjectConfig()
+	projectCfgPath, err := findProjectConfig()
 
 	if err != nil {
 		return nil, err
 	}
 
-	os.Setenv(projectRootEnvVar, filepath.Dir(projectConfigPath))
+	os.Setenv(projectRootEnvVar, filepath.Dir(projectCfgPath))
 
-	var projectConfig *Config
+	var projectCfg *Config
 
-	if projectConfigPath != "" {
-		projectConfig, err = readConfigFileIfExists(projectConfigPath)
+	if projectCfgPath != "" {
+		projectCfg, err = readConfigFileIfExists(projectCfgPath)
 
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	if projectConfig != nil {
-		if err := loadAndMergeImports(projectConfig); err != nil {
+	if projectCfg != nil {
+		if err := loadAndMergeImports(projectCfg, projectCfgPath); err != nil {
 			return nil, err
 		}
 	}
 
 	switch {
-	case userConfig == nil && projectConfig == nil:
+	case userCfg == nil && projectCfg == nil:
 		return nil, nil
-	case userConfig == nil:
-		return projectConfig, nil
-	case projectConfig == nil:
-		return userConfig, nil
+	case userCfg == nil:
+		return projectCfg, nil
+	case projectCfg == nil:
+		return userCfg, nil
 	default:
-		userConfig.Merge(projectConfig)
-		return userConfig, nil
+		userCfg.Merge(projectCfg)
+		return userCfg, nil
 	}
 }
 
