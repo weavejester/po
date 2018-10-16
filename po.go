@@ -397,10 +397,16 @@ func loadRootImports(config *Config, path string) error {
 	return loadImports(config, []Import{Import{File: path}})
 }
 
-const projectRootEnvVar = "PO_PROJECT_ROOT"
+const poPathEnvVar = "POPATH"
+const poHomeEnvVar = "POHOME"
 
 func loadAllConfigs() (*Config, error) {
 	userCfgPath := userConfigPath()
+
+	if err := os.Setenv(poHomeEnvVar, filepath.Dir(userCfgPath)); err != nil {
+		return nil, err
+	}
+
 	userCfg, err := readConfigFile(userCfgPath)
 
 	if err != nil {
@@ -419,7 +425,9 @@ func loadAllConfigs() (*Config, error) {
 		return nil, err
 	}
 
-	os.Setenv(projectRootEnvVar, filepath.Dir(projectCfgPath))
+	if err := os.Setenv(poPathEnvVar, filepath.Dir(projectCfgPath)); err != nil {
+		return nil, err
+	}
 
 	var projectCfg *Config
 

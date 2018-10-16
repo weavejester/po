@@ -27,7 +27,8 @@ commands:
     short: Tests environment vars
     run: |
       echo PWD=$PWD
-      echo PO_PROJECT_ROOT=$PO_PROJECT_ROOT
+      echo POPATH=$POPATH
+      echo POHOME=$POHOME
       echo aaa=$aaa
       echo bbb=$bbb
 
