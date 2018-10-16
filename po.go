@@ -181,18 +181,6 @@ func (a *Config) Merge(b *Config) {
 	}
 }
 
-var rootCmd = &cobra.Command{
-	Use:           "po",
-	Short:         "CLI for managing project-specific scripts",
-	Version:       "0.0.1",
-	SilenceUsage:  true,
-	SilenceErrors: true,
-	Run: func(cmd *cobra.Command, args []string) {
-		cmd.Help()
-		os.Exit(0)
-	},
-}
-
 func parseConfig(dat []byte) (*Config, error) {
 	var config Config
 
@@ -877,31 +865,6 @@ func deleteCacheFiles() error {
 	return deleteFilesInDir(cacheDir)
 }
 
-func addInbuiltCommands(config *Config, parentCmd *cobra.Command) error {
-	_, err := buildCommand(config, parentCmd, "po", &Command{
-		Short: "Built-in commands",
-	})
-
-	if err != nil {
-		return err
-	}
-
-	refreshCmd, err := buildCommand(config, parentCmd, "po:refresh", &Command{
-		Short: "Refresh import cache",
-	})
-
-	if err != nil {
-		return err
-	}
-
-	refreshCmd.Run = func(cmd *cobra.Command, args []string) {
-		deleteCacheFiles()
-		os.Exit(0)
-	}
-
-	return nil
-}
-
 func printError(cmd *cobra.Command, err error) {
 	boldRed := color.New(color.Bold, color.FgRed)
 	boldRed.Fprintf(os.Stderr, "ERROR")
@@ -909,10 +872,38 @@ func printError(cmd *cobra.Command, err error) {
 	fmt.Fprintf(os.Stderr, "Run '%v --help' for usage.\n", cmd.CommandPath())
 }
 
+var rootCmd = &cobra.Command{
+	Use:           "po",
+	Short:         "CLI for managing project-specific scripts",
+	Version:       "0.0.1",
+	SilenceUsage:  true,
+	SilenceErrors: true,
+	Run: func(cmd *cobra.Command, args []string) {
+		refresh, err := cmd.Flags().GetBool("refresh")
+
+		if err != nil {
+			printError(cmd, err)
+			os.Exit(1)
+		}
+
+		switch {
+		case refresh:
+			if err := deleteCacheFiles(); err != nil {
+				printError(cmd, err)
+				os.Exit(1)
+			}
+		default:
+			cmd.Help()
+			os.Exit(0)
+		}
+	},
+}
+
 func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 
 	rootCmd.SetUsageFunc(rootUsageFunc)
+	rootCmd.Flags().BoolP("refresh", "", false, "clear import cache")
 
 	config, err := loadAllConfigs()
 
@@ -925,14 +916,9 @@ func init() {
 		config = &Config{}
 	}
 
-	if err := addInbuiltCommands(config, rootCmd); err != nil {
-		printError(rootCmd, err)
-		os.Exit(3)
-	}
-
 	if err := buildCommandsFromConfig(config, rootCmd); err != nil {
 		printError(rootCmd, err)
-		os.Exit(4)
+		os.Exit(3)
 	}
 }
 
