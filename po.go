@@ -696,10 +696,14 @@ func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Comma
 				bold.Fprintf(out, "\nFLAGS\n")
 				fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
 			}
-			fmt.Println()
+
 		}
 
 		if hasSubCommands(rootCmd, cobra) {
+			if run != "" {
+				fmt.Println()
+			}
+
 			bold.Fprintf(out, "COMMANDS\n")
 			fmt.Fprintf(out, subCommandUsages(parentCmd, cobra))
 		}
