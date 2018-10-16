@@ -75,7 +75,15 @@ FLAGS
 COMMANDS
   hello
   help        Help about any command
-  po          Built-in commands
+```
+
+We can also run `po --commands` for a more concise and
+tooling-friendly list:
+
+```
+$ po --commands
+hello
+help        Help about any command
 ```
 
 It would be nice if we could add a description to our `hello`
@@ -90,23 +98,12 @@ commands:
     run: echo Hello World
 ```
 
-Now when we run `po`:
+Now when we take a look at the commands:
 
 ```
-$ po
-CLI for managing project-specific scripts
-
-USAGE
-  po [COMMAND] [FLAGS]
-
-FLAGS
-  -h, --help      help for po
-      --version   version for po
-
-COMMANDS
-  hello       Prints a greeting
-  help        Help about any command
-  po          Built-in commands
+$ po --commands
+hello       Prints a greeting
+help        Help about any command
 ```
 
 If we use `po help`, we can get a longer description:
@@ -225,6 +222,7 @@ $ po hello
 Hello World
 ```
 
+
 ### Vars
 
 You've probably noticed that flags and arguments are passed to the run
@@ -308,11 +306,11 @@ COMMANDS
   po          Built-in commands
 ```
 
-URL imports are cached locally indefinitely. To force po to refresh
-all of its imports and download the URLs again, run:
+URL imports are cached locally indefinitely. To force po to clear its
+cache and re-download imported URLs, run:
 
 ```
-$ po po:refresh
+$ po --refresh
 ```
 
 
