@@ -635,39 +635,17 @@ func isRootCommand(cmd *cobra.Command) bool {
 	return !strings.Contains(cmd.Name(), ":")
 }
 
-func commandUsages(command *cobra.Command) string {
+func rootCommandUsages(command *cobra.Command, prefix string) string {
 	usage := ""
 	padding := command.NamePadding()
 
 	for _, cmd := range command.Commands() {
 		if isRootCommand(cmd) {
-			usage += fmt.Sprintf("  %s %s\n", rightPad(cmd.Name(), padding), cmd.Short)
+			usage += fmt.Sprintf("%s%s %s\n", prefix, rightPad(cmd.Name(), padding), cmd.Short)
 		}
 	}
 
 	return usage
-}
-
-func rootUsageFunc(rootCmd *cobra.Command) error {
-	bold := color.New(color.Bold)
-	out := rootCmd.OutOrStderr()
-
-	bold.Fprintf(out, "USAGE\n")
-	fmt.Fprintf(out, "  %s [COMMAND] [FLAGS]\n", rootCmd.CommandPath())
-
-	if rootCmd.HasAvailableLocalFlags() {
-		bold.Fprintf(out, "\nFLAGS\n")
-		fmt.Fprintf(out, rootCmd.LocalFlags().FlagUsages())
-	}
-
-	bold.Fprintf(out, "\nCOMMANDS\n")
-	if rootCmd.HasAvailableSubCommands() {
-		fmt.Fprintf(out, commandUsages(rootCmd))
-	} else {
-		fmt.Fprintln(out, "  No commands found. Have you created a po.yml file?")
-	}
-
-	return nil
 }
 
 func isSubCommand(parentCmd *cobra.Command, cmd *cobra.Command) bool {
@@ -872,6 +850,17 @@ func printError(cmd *cobra.Command, err error) {
 	fmt.Fprintf(os.Stderr, "Run '%v --help' for usage.\n", cmd.CommandPath())
 }
 
+func getRootBoolFlag(cmd *cobra.Command, name string) bool {
+	value, err := cmd.Flags().GetBool(name)
+
+	if err != nil {
+		printError(cmd, err)
+		os.Exit(1)
+	}
+
+	return value
+}
+
 var rootCmd = &cobra.Command{
 	Use:           "po",
 	Short:         "CLI for managing project-specific scripts",
@@ -879,12 +868,8 @@ var rootCmd = &cobra.Command{
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Run: func(cmd *cobra.Command, args []string) {
-		refresh, err := cmd.Flags().GetBool("refresh")
-
-		if err != nil {
-			printError(cmd, err)
-			os.Exit(1)
-		}
+		refresh := getRootBoolFlag(cmd, "refresh")
+		commands := getRootBoolFlag(cmd, "commands")
 
 		switch {
 		case refresh:
@@ -892,6 +877,9 @@ var rootCmd = &cobra.Command{
 				printError(cmd, err)
 				os.Exit(1)
 			}
+		case commands:
+			cmd.Printf(rootCommandUsages(cmd, ""))
+			os.Exit(0)
 		default:
 			cmd.Help()
 			os.Exit(0)
@@ -899,10 +887,33 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+func rootUsageFunc(rootCmd *cobra.Command) error {
+	bold := color.New(color.Bold)
+	out := rootCmd.OutOrStderr()
+
+	bold.Fprintf(out, "USAGE\n")
+	fmt.Fprintf(out, "  %s [COMMAND] [FLAGS]\n", rootCmd.CommandPath())
+
+	if rootCmd.HasAvailableLocalFlags() {
+		bold.Fprintf(out, "\nFLAGS\n")
+		fmt.Fprintf(out, rootCmd.LocalFlags().FlagUsages())
+	}
+
+	bold.Fprintf(out, "\nCOMMANDS\n")
+	if rootCmd.HasAvailableSubCommands() {
+		fmt.Fprintf(out, rootCommandUsages(rootCmd, "  "))
+	} else {
+		fmt.Fprintln(out, "  No commands found. Have you created a po.yml file?")
+	}
+
+	return nil
+}
+
 func init() {
 	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
 
 	rootCmd.SetUsageFunc(rootUsageFunc)
+	rootCmd.Flags().BoolP("commands", "c", false, "list commands")
 	rootCmd.Flags().BoolP("refresh", "", false, "clear import cache")
 
 	config, err := loadAllConfigs()
