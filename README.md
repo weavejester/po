@@ -69,8 +69,10 @@ USAGE
   po [COMMAND] [FLAGS]
 
 FLAGS
-  -h, --help      help for po
-      --version   version for po
+  -c, --commands   list commands
+  -h, --help       help for po
+      --refresh    clear import cache
+      --version    version for po
 
 COMMANDS
   hello
