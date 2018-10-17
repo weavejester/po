@@ -155,7 +155,7 @@ type Import struct {
 	Url  string
 }
 
-func mergeVars(a map[string]string, b map[string]string) {
+func mergeStringMaps(a map[string]string, b map[string]string) {
 	for k, vb := range b {
 		a[k] = vb
 	}
@@ -163,6 +163,7 @@ func mergeVars(a map[string]string, b map[string]string) {
 
 type Config struct {
 	Imports  []Import
+	Aliases  map[string]string
 	Vars     map[string]string
 	Commands map[string]Command
 }
@@ -177,7 +178,13 @@ func (a *Config) Merge(b *Config) {
 	if a.Vars == nil {
 		a.Vars = b.Vars
 	} else if b.Vars != nil {
-		mergeVars(a.Vars, b.Vars)
+		mergeStringMaps(a.Vars, b.Vars)
+	}
+
+	if a.Aliases == nil {
+		a.Aliases = b.Aliases
+	} else if b.Aliases != nil {
+		mergeStringMaps(a.Aliases, b.Aliases)
 	}
 }
 
@@ -622,6 +629,18 @@ func formatUsage(name string, command *Command) string {
 	return usageArgs
 }
 
+func getCommandAliases(config *Config, name string) []string {
+	var aliases []string
+
+	for k, v := range config.Aliases {
+		if v == name {
+			aliases = append(aliases, k)
+		}
+	}
+
+	return aliases
+}
+
 func rightPad(s string, padding int) string {
 	template := fmt.Sprintf("%%-%ds", padding)
 	return fmt.Sprintf(template, s)
@@ -694,6 +713,11 @@ func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Comma
 		if run != "" {
 			bold.Fprintf(out, "USAGE\n")
 			fmt.Fprintf(out, "  %s [FLAGS]\n", cobra.UseLine())
+
+			if len(cobra.Aliases) > 0 {
+				bold.Fprintf(out, "\nALIASES\n")
+				fmt.Fprintf(out, "  %s\n", strings.Join(cobra.Aliases, ", "))
+			}
 
 			if len(args) > 0 {
 				bold.Fprintf(out, "\nARGUMENTS\n")
@@ -789,6 +813,7 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 func buildCommand(config *Config, parentCmd *cobra.Command, name string, command *Command) (*cobra.Command, error) {
 	cmd := cobra.Command{
 		Use:                   formatUsage(name, command),
+		Aliases:               getCommandAliases(config, name),
 		Short:                 command.Short,
 		Long:                  command.Long,
 		Args:                  argsMatchDefs(command.Args),

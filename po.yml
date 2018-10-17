@@ -3,6 +3,9 @@ imports:
 vars:
   aaa: hello
   bbb: world
+aliases:
+  g: greet
+  e: envvars
 commands:
   greet:
     short: Prints a message
