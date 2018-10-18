@@ -6,6 +6,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	"golang.org/x/sys/unix"
 	"gopkg.in/yaml.v2"
 	"io"
 	"io/ioutil"
@@ -16,7 +17,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 type Argument struct {
@@ -628,7 +628,7 @@ func execScript(exec string, env []string, script string) error {
 		return err
 	}
 
-	return syscall.Exec(path, []string{}, env)
+	return unix.Exec(path, []string{}, env)
 }
 
 func formatArgDef(def Argument) string {
