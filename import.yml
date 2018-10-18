@@ -1,10 +1,10 @@
 imports:
-  - url: https://gist.githubusercontent.com/weavejester/a0ae9d320b314df199719fb9fa8c6c2f/raw/80fe1929648c797b9bf717c4b7f9110c3aa7d094/import.yml
+  - url: https://git.io/fxVcZ
 commands:
   imported:
     short: Imported command
-    run: echo imported
+    script: echo imported
 
   greet:
     short: Imported greet
-    run: echo imported greet
+    script: echo imported greet

@@ -14,7 +14,7 @@ commands:
     args:
       - var: name
         short: a name to say hello to
-    run: echo Hello $name
+    script: echo Hello $name
 
   bye:
     short: Prints another message
@@ -24,7 +24,7 @@ commands:
         type: string
         short: n
         default: World
-    run: echo Goodbye $name
+    script: echo Goodbye $name
 
   envvars:
     short: Tests environment vars
@@ -38,7 +38,7 @@ commands:
   py:
     short: Tests a different interpreter
     exec: /usr/bin/env python
-    run: print "Hello World"
+    script: print "Hello World"
 
   flagger:
     short: Flag test
@@ -49,11 +49,11 @@ commands:
       bar:
         desc: int flag
         type: int
-    run: echo foo=$foo bar=$bar
+    script: echo foo=$foo bar=$bar
 
   group:
     short: A grouping of commands
     commands:
       subtask:
         short: A subtask
-        run: echo Subtasking around
+        script: echo Subtasking around

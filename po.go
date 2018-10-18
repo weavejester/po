@@ -85,7 +85,7 @@ type Command struct {
 	Args     []Argument
 	Flags    map[string]Flag
 	Exec     string
-	Run      string
+	Script   string
 	Commands map[string]Command
 }
 
@@ -138,8 +138,8 @@ func (a *Command) Merge(b *Command) {
 	if b.Long != "" {
 		a.Long = b.Long
 	}
-	if b.Run != "" {
-		a.Run = b.Run
+	if b.Script != "" {
+		a.Script = b.Script
 	}
 
 	if len(b.Args) > 0 {
@@ -730,13 +730,13 @@ func subCommandUsages(parentCmd *cobra.Command, cmd *cobra.Command) string {
 func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Command) error {
 	bold := color.New(color.Bold)
 	args := command.Args
-	run := command.Run
+	script := command.Script
 	argUsageText := argUsages(command)
 
 	return func(cobra *cobra.Command) error {
 		out := cobra.OutOrStderr()
 
-		if run != "" {
+		if script != "" {
 			bold.Fprintf(out, "USAGE\n")
 			fmt.Fprintf(out, "  %s [FLAGS]\n", cobra.UseLine())
 
@@ -758,7 +758,7 @@ func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Comma
 		}
 
 		if hasSubCommands(rootCmd, cobra) {
-			if run != "" {
+			if script != "" {
 				fmt.Println()
 			}
 
@@ -815,15 +815,15 @@ func buildFlags(cmd *cobra.Command, flags map[string]Flag) error {
 }
 
 func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string) {
-	if command.Run == "" {
+	if command.Script == "" {
 		return nil
 	}
 
 	configEnv := configEnvVars(config)
 
-	commandExec := command.Exec
 	commandArgs := command.Args
-	commandRun := command.Run
+	exec := command.Exec
+	script := command.Script
 
 	return func(cmd *cobra.Command, args []string) {
 		env := os.Environ()
@@ -831,7 +831,7 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 		env = append(env, argEnvVars(commandArgs, args)...)
 		env = append(env, flagEnvVars(cmd.Flags())...)
 
-		if err := execScript(commandExec, env, commandRun); err != nil {
+		if err := execScript(exec, env, script); err != nil {
 			log.Fatalf("error: %v", err)
 		}
 	}
