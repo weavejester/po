@@ -84,6 +84,7 @@ type Command struct {
 	Long     string
 	Args     []Argument
 	Flags    map[string]Flag
+	Example  string
 	Exec     string
 	Script   string
 	Commands map[string]Command
@@ -727,6 +728,16 @@ func subCommandUsages(parentCmd *cobra.Command, cmd *cobra.Command) string {
 	return usage
 }
 
+func formatLines(format string, s string) string {
+	lines := strings.Split(s, "\n")
+
+	for i, line := range lines {
+		lines[i] = fmt.Sprintf(format, line)
+	}
+
+	return strings.Join(lines, "")
+}
+
 func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Command) error {
 	bold := color.New(color.Bold)
 	args := command.Args
@@ -755,6 +766,11 @@ func makeUsageFunc(parentCmd *cobra.Command, command *Command) func(*cobra.Comma
 				fmt.Fprintf(out, cobra.LocalFlags().FlagUsages())
 			}
 
+			if cobra.HasExample() {
+				bold.Fprintf(out, "\nEXAMPLE\n")
+				example := strings.TrimRight(cobra.Example, " \n")
+				fmt.Fprintf(out, formatLines("  %s\n", example))
+			}
 		}
 
 		if hasSubCommands(rootCmd, cobra) {
@@ -844,6 +860,7 @@ func buildCommand(config *Config, parentCmd *cobra.Command, name string, command
 		Short:                 command.Short,
 		Long:                  command.Long,
 		Args:                  argsMatchDefs(command.Args),
+		Example:               command.Example,
 		DisableFlagsInUseLine: true,
 		Run:                   makeRunFunc(config, command),
 	}

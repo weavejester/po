@@ -14,6 +14,9 @@ commands:
     args:
       - var: name
         short: a name to say hello to
+    example: |
+      $ po greet Alice
+      Hello Alice
     script: echo Hello $name
 
   bye:
