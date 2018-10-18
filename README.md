@@ -272,9 +272,7 @@ For example, let's add an import to our `po.yml` file:
 
 ```yaml
 imports:
-  - url: https://git.io/fxuv1
-vars:
-  greet: Hey
+  - url: https://git.io/fxVcZ
 commands:
   hello:
     short: Prints a greeting
@@ -283,9 +281,8 @@ commands:
       name:
         type: string
         desc: a name to greet
-        short: n
         default: World
-    script: echo $greet $name
+    script: echo Hello $name
 ```
 
 This import adds an extra command, `po bye`
@@ -305,16 +302,13 @@ $ po --refresh
 ```
 
 
-### Nesting
+### Exec
 
-Finally, commands can be nested below other commands. We can use this
-to add an alternative version of our `hello` command:
+You can change the interpreter for the script via the `exec`
+option. By default scripts are executed with `/bin/sh`, but you can
+change this to anything compatible with a shebang line:
 
 ```yaml
-imports:
-  - url: https://git.io/fxuv1
-vars:
-  greet: Hey
 commands:
   hello:
     short: Prints a greeting
@@ -325,7 +319,32 @@ commands:
         desc: a name to greet
         short: n
         default: World
-    script: echo $greet $name
+    exec: /usr/bin/env python3
+    script: |
+      import os
+      print("Hello", os.environ['name'])
+```
+
+Flags and arguments are still handled through environment variables.
+
+
+### Nesting
+
+Commands can be nested below other commands. We can use this to add an
+alternative version of our `hello` command:
+
+```yaml
+commands:
+  hello:
+    short: Prints a greeting
+    long: Prints 'Hello NAME' to STDOUT.
+    flags:
+      name:
+        type: string
+        desc: a name to greet
+        short: n
+        default: World
+    script: echo Hello $name
     commands:
       loud:
         short: Loudly prints a greeting
@@ -337,7 +356,7 @@ commands:
             short: n
             default: World
         script: |
-          echo $greet $name | awk '{print toupper}'
+          echo Hello $name | awk '{print toupper}'
 ```
 
 If we check the help message for `hello`, we can see it now has a
@@ -362,7 +381,7 @@ If we run `hello:loud`:
 
 ```
 $ po hello:loud --name Alice
-HEY ALICE
+HELLO ALICE
 ```
 
 Subcommands can be used to create alternative versions of existing
