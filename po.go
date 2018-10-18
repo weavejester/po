@@ -12,7 +12,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"strconv"
@@ -85,6 +84,7 @@ type Command struct {
 	Long     string
 	Args     []Argument
 	Flags    map[string]Flag
+	Exec     string
 	Run      string
 	Commands map[string]Command
 }
@@ -228,9 +228,9 @@ func readConfigFileIfExists(path string) (*Config, error) {
 	return readConfigFile(path)
 }
 
-func urlCacheFilename(url string) string {
+func sha1HexString(s string) string {
 	h := sha1.New()
-	h.Write([]byte(url))
+	h.Write([]byte(s))
 
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
@@ -242,7 +242,7 @@ func readUrlCache(url string) ([]byte, error) {
 		return nil, err
 	}
 
-	cachePath := filepath.Join(userCacheDir, "po", urlCacheFilename(url))
+	cachePath := filepath.Join(userCacheDir, "po", "imports", sha1HexString(url))
 
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		return nil, nil
@@ -258,13 +258,13 @@ func writeUrlCache(url string, dat []byte) error {
 		return err
 	}
 
-	cacheDir := filepath.Join(userCacheDir, "po")
+	cacheDir := filepath.Join(userCacheDir, "po", "imports")
 
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return err
 	}
 
-	path := filepath.Join(cacheDir, urlCacheFilename(url))
+	path := filepath.Join(cacheDir, sha1HexString(url))
 
 	return ioutil.WriteFile(path, dat, 0644)
 }
@@ -587,22 +587,48 @@ func argsMatchDefs(defs []Argument) cobra.PositionalArgs {
 	}
 }
 
-func execShell(shellCmd string, env []string) error {
-	sh, err := exec.LookPath("sh")
+func buildScript(exec string, script string) string {
+	return fmt.Sprintf("#! %s\n%s", exec, script)
+}
+
+func scriptCachePath(exec string, script string) (string, error) {
+	userCacheDir, err := os.UserCacheDir()
+
+	if err != nil {
+		return "", err
+	}
+
+	cacheDir := filepath.Join(userCacheDir, "po", "scripts")
+
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return "", err
+	}
+
+	scriptText := buildScript(exec, script)
+	scriptPath := filepath.Join(cacheDir, sha1HexString(scriptText))
+
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		err = ioutil.WriteFile(scriptPath, []byte(scriptText), 0755)
+		return scriptPath, err
+	}
+
+	return scriptPath, nil
+}
+
+const defaultExecPath = "/bin/sh"
+
+func execScript(exec string, env []string, script string) error {
+	if exec == "" {
+		exec = defaultExecPath
+	}
+
+	path, err := scriptCachePath(exec, script)
 
 	if err != nil {
 		return err
 	}
 
-	args := []string{"sh", "-c", shellCmd}
-
-	err = syscall.Exec(sh, args, env)
-
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return syscall.Exec(path, []string{}, env)
 }
 
 func formatArgDef(def Argument) string {
@@ -795,6 +821,7 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 
 	configEnv := configEnvVars(config)
 
+	commandExec := command.Exec
 	commandArgs := command.Args
 	commandRun := command.Run
 
@@ -804,7 +831,7 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 		env = append(env, argEnvVars(commandArgs, args)...)
 		env = append(env, flagEnvVars(cmd.Flags())...)
 
-		if err := execShell(commandRun, env); err != nil {
+		if err := execScript(commandExec, env, commandRun); err != nil {
 			log.Fatalf("error: %v", err)
 		}
 	}
@@ -871,13 +898,23 @@ func deleteCacheFiles() error {
 		return err
 	}
 
-	cacheDir := filepath.Join(userCacheDir, "po")
+	importsCacheDir := filepath.Join(userCacheDir, "po", "imports")
 
-	if _, err := os.Stat(cacheDir); os.IsNotExist(err) {
+	if _, err := os.Stat(importsCacheDir); os.IsNotExist(err) {
 		return nil
 	}
 
-	return deleteFilesInDir(cacheDir)
+	if err := deleteFilesInDir(importsCacheDir); err != nil {
+		return err
+	}
+
+	scriptsCacheDir := filepath.Join(userCacheDir, "po", "scripts")
+
+	if _, err := os.Stat(scriptsCacheDir); os.IsNotExist(err) {
+		return nil
+	}
+
+	return deleteFilesInDir(scriptsCacheDir)
 }
 
 func printError(cmd *cobra.Command, err error) {

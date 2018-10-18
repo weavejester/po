@@ -35,6 +35,11 @@ commands:
       echo aaa=$aaa
       echo bbb=$bbb
 
+  py:
+    short: Tests a different interpreter
+    exec: /usr/bin/env python
+    run: print "Hello World"
+
   flagger:
     short: Flag test
     flags:
