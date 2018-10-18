@@ -49,7 +49,7 @@ A minimal `po.yml` file looks like:
 ```yaml
 commands:
   hello:
-    run: echo Hello World
+    script: echo Hello World
 ```
 
 As you might expect, if you run `po hello`, you get a message:
@@ -97,7 +97,7 @@ commands:
   hello:
     short: Prints a greeting
     long: Prints 'Hello World' to STDOUT.
-    run: echo Hello World
+    script: echo Hello World
 ```
 
 Now when we take a look at the commands:
@@ -138,7 +138,7 @@ commands:
     args:
       - var: name
         desc: a name to greet
-    run: echo Hello $name
+    script: echo Hello $name
 ```
 
 Now if we run `po hello --help` we can see the command has an
@@ -192,7 +192,7 @@ commands:
         desc: a name to greet
         short: n
         default: World
-    run: echo Hello $name
+    script: echo Hello $name
 ```
 
 If we take a look at the help for this command again:
@@ -244,7 +244,7 @@ commands:
         desc: a name to greet
         short: n
         default: World
-    run: echo $greet $name
+    script: echo $greet $name
 ```
 
 Running the command:
@@ -285,27 +285,16 @@ commands:
         desc: a name to greet
         short: n
         default: World
-    run: echo $greet $name
+    script: echo $greet $name
 ```
 
 This import adds an extra command, `po bye`
 
 ```
-$ po
-CLI for managing project-specific scripts
-
-USAGE
-  po [COMMAND] [FLAGS]
-
-FLAGS
-  -h, --help      help for po
-      --version   version for po
-
-COMMANDS
-  bye         Prints a farewell
-  hello       Prints a greeting
-  help        Help about any command
-  po          Built-in commands
+$ po --commands
+bye         Prints a farewell
+hello       Prints a greeting
+help        Help about any command
 ```
 
 URL imports are cached locally indefinitely. To force po to clear its
@@ -336,7 +325,7 @@ commands:
         desc: a name to greet
         short: n
         default: World
-    run: echo $greet $name
+    script: echo $greet $name
     commands:
       loud:
         short: Loudly prints a greeting
@@ -347,7 +336,7 @@ commands:
             desc: a name to greet
             short: n
             default: World
-        run: |
+        script: |
           echo $greet $name | awk '{print toupper}'
 ```
 
