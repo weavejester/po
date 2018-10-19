@@ -35,8 +35,10 @@ func (arg *Argument) AtLeast() int {
 }
 
 func (arg *Argument) AtMost() int {
-	if arg.AtMostP == nil {
-		return arg.AtLeast()
+	if arg.AtLeastP == nil && arg.AtMostP == nil {
+		return 1
+	} else if arg.AtMostP == nil {
+		return 0
 	} else {
 		return *arg.AtMostP
 	}
@@ -480,7 +482,11 @@ func maxArgLength(defs []Argument) int {
 	maxLength := 0
 
 	for _, def := range defs {
-		maxLength += def.AtMost()
+		if atMost := def.AtMost(); atMost == 0 {
+			return -1
+		} else {
+			maxLength += atMost
+		}
 	}
 
 	return maxLength
@@ -497,10 +503,18 @@ func argEnvVars(defs []Argument, args []string) []string {
 
 	for i, def := range defs {
 		required -= def.AtLeast()
-		aNext := a + def.AtMost()
+		maxSlice := len(args) - required
 
-		if aNext > len(args)-required {
-			aNext = len(args)
+		aNext := a
+
+		if atMost := def.AtMost(); atMost == 0 {
+			aNext += maxSlice
+		} else {
+			aNext += atMost
+		}
+
+		if aNext > maxSlice {
+			aNext = maxSlice
 		}
 
 		env[i] = envVarPair(def.Var, args[a:aNext])
@@ -574,7 +588,7 @@ func argsMatchDefs(defs []Argument) cobra.PositionalArgs {
 		switch {
 		case minLength == 0 && maxLength == 0 && len(args) > 0:
 			return fmt.Errorf("should have no arguments")
-		case minLength == maxLength && len(args) != maxLength:
+		case maxLength > 0 && minLength == maxLength && len(args) != maxLength:
 			return fmt.Errorf("requires exactly %d arguments", maxLength)
 		case maxLength > 0 && minLength > 0 && (len(args) < minLength || len(args) > maxLength):
 			return fmt.Errorf("requires between %d and %d arguments", minLength, maxLength)
@@ -635,7 +649,7 @@ func execScript(exec string, env []string, script string) error {
 func formatArgDef(def Argument) string {
 	arg := strings.ToUpper(def.Var)
 
-	if def.AtLeast() > 1 || def.AtMost() > 1 {
+	if def.AtLeast() > 1 || def.AtMost() != 1 {
 		arg = fmt.Sprintf("%s...", arg)
 	}
 
