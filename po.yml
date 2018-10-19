@@ -14,6 +14,9 @@ commands:
     args:
       - var: name
         short: a name to say hello to
+        amount:
+          at_least: 0
+          at_most: 1
     example: |
       $ po greet Alice
       Hello Alice

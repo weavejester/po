@@ -52,6 +52,25 @@ func (a *Amount) Merge(b *Amount) {
 	}
 }
 
+func (amount *Amount) Validate() error {
+	if amount.AtMostP != nil {
+		if *amount.AtMostP < 0 {
+			return fmt.Errorf("at_most cannot be less than zero")
+		}
+		if amount.AtLeastP != nil && *amount.AtLeastP > *amount.AtMostP {
+			return fmt.Errorf("at_most cannot be greater than at_least")
+		}
+	}
+
+	if amount.AtLeastP != nil {
+		if *amount.AtLeastP < 0 {
+			return fmt.Errorf("at_least cannot be less than zero")
+		}
+	}
+
+	return nil
+}
+
 type Argument struct {
 	Var    string
 	Short  string
@@ -66,6 +85,10 @@ func (a *Argument) Merge(b *Argument) {
 		a.Short = b.Short
 	}
 	a.Amount.Merge(&b.Amount)
+}
+
+func (arg *Argument) Validate() error {
+	return arg.Amount.Validate()
 }
 
 type Flag struct {
@@ -180,6 +203,13 @@ func (command *Command) Validate() error {
 			return err
 		}
 	}
+
+	for _, arg := range command.Args {
+		if err := arg.Validate(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
