@@ -15,6 +15,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -199,6 +200,31 @@ func (a *Config) Merge(b *Config) {
 	}
 }
 
+var commandNameRegexp = regexp.MustCompile(`^\pL[\pL\d-_]*$`)
+
+func validateCommandName(name string) error {
+	if !commandNameRegexp.MatchString(name) {
+		return fmt.Errorf("invalid command name: %s", name)
+	}
+	return nil
+}
+
+func (config *Config) Validate() error {
+	for name, _ := range config.Commands {
+		if err := validateCommandName(name); err != nil {
+			return err
+		}
+	}
+
+	for name, _ := range config.Aliases {
+		if err := validateCommandName(name); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func parseConfig(dat []byte) (*Config, error) {
 	var config Config
 
@@ -206,7 +232,7 @@ func parseConfig(dat []byte) (*Config, error) {
 		return nil, err
 	}
 
-	return &config, nil
+	return &config, config.Validate()
 }
 
 func readConfig(reader io.Reader) (*Config, error) {
