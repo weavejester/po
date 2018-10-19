@@ -174,6 +174,28 @@ $ po hello Bob
 Hello Bob
 ```
 
+You can also set variables to be bound to multiple arguments by
+defining the `amount` of arguments you want. Set `at_least` to specify
+a minimum number of arguments, and `at_most` to specify a maximum.
+Leave `at_most` blank (or `~`) if you don't want a maximum:
+
+```yaml
+commands:
+  hello:
+    short: Prints a greeting
+    long: Prints 'Hello NAME...' to STDOUT.
+    args:
+      - var: names
+        desc: a name to greet
+        amount:
+          at_least: 0
+          at_most: 1
+    script: echo Hello $names
+```
+
+If the `amount` is left unset, then `at_least` and `at_most` are both
+set to 1.
+
 
 ### Flags
 
