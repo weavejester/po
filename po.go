@@ -162,9 +162,42 @@ func (a *Command) Merge(b *Command) {
 	mergeCommands(a.Commands, b.Commands)
 }
 
+var commandNameRegexp = regexp.MustCompile(`^\pL[\pL\d-_]*$`)
+
+func validateCommandName(name string) error {
+	if !commandNameRegexp.MatchString(name) {
+		return fmt.Errorf("invalid command name: %s", name)
+	}
+	return nil
+}
+
+func (command *Command) Validate() error {
+	for name, subCommand := range command.Commands {
+		if err := validateCommandName(name); err != nil {
+			return err
+		}
+		if err := subCommand.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 type Import struct {
 	File string
 	Url  string
+}
+
+func (imp *Import) Validate() error {
+	if imp.File == "" && imp.Url == "" {
+		return fmt.Errorf("import requires a 'url' or 'file' key set")
+	}
+
+	if imp.File != "" && imp.Url != "" {
+		return fmt.Errorf("import cannot have both a 'url' and 'file' key set")
+	}
+
+	return nil
 }
 
 func mergeStringMaps(a map[string]string, b map[string]string) {
@@ -200,24 +233,24 @@ func (a *Config) Merge(b *Config) {
 	}
 }
 
-var commandNameRegexp = regexp.MustCompile(`^\pL[\pL\d-_]*$`)
-
-func validateCommandName(name string) error {
-	if !commandNameRegexp.MatchString(name) {
-		return fmt.Errorf("invalid command name: %s", name)
-	}
-	return nil
-}
-
 func (config *Config) Validate() error {
-	for name, _ := range config.Commands {
-		if err := validateCommandName(name); err != nil {
+	for _, imp := range config.Imports {
+		if err := imp.Validate(); err != nil {
 			return err
 		}
 	}
 
 	for name, _ := range config.Aliases {
 		if err := validateCommandName(name); err != nil {
+			return err
+		}
+	}
+
+	for name, command := range config.Commands {
+		if err := validateCommandName(name); err != nil {
+			return err
+		}
+		if err := command.Validate(); err != nil {
 			return err
 		}
 	}
