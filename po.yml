@@ -55,7 +55,7 @@ commands:
       bar:
         desc: int flag
         type: int
-    script: echo foo=$foo bar=$bar
+    script: echo $FLAGS
 
   group:
     short: A grouping of commands

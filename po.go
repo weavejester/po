@@ -661,6 +661,25 @@ func flagEnvVars(flags *pflag.FlagSet) []string {
 	return env[:i]
 }
 
+func allFlagsEnvVar(flags *pflag.FlagSet) string {
+	args := make([]string, countFlagsWithValues(flags))
+	i := 0
+
+	visitFlagsWithValues(flags, func(f *pflag.Flag) {
+		if f.Value.Type() == "bool" {
+			if f.Value.String() != "false" {
+				args[i] = fmt.Sprintf("--%s", f.Name)
+				i++
+			}
+		} else {
+			args[i] = fmt.Sprintf("--%s %s", f.Name, flagValueOrDefault(f))
+			i++
+		}
+	})
+
+	return "FLAGS=" + strings.Join(args[:i], " ")
+}
+
 func configEnvVars(config *Config) []string {
 	if config.Vars == nil {
 		return []string{}
@@ -957,6 +976,7 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 		env = append(env, configEnv...)
 		env = append(env, argEnvVars(commandArgs, args)...)
 		env = append(env, flagEnvVars(cmd.Flags())...)
+		env = append(env, allFlagsEnvVar(cmd.Flags()))
 
 		if err := execScript(exec, env, script); err != nil {
 			log.Fatalf("error: %v", err)
