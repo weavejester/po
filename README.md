@@ -196,6 +196,9 @@ commands:
 If the `amount` is left unset, then `at_least` and `at_most` are both
 set to 1.
 
+As a final convenience, you can access all arguments concatenated in
+order by using the `$ARGS` variable.
+
 
 ### Flags
 
@@ -244,6 +247,62 @@ Hello Carol
 
 $ po hello
 Hello World
+```
+
+If you want to pass the flags verbatim to a command, you can get all
+the flags and their values concatenated together with the `$FLAGS`
+environment variable.
+
+```yaml
+commands:
+  flags:
+    short: Prints the flags
+    flags:
+      name:
+        type: string
+        desc: a name
+        short: n
+        default: World
+    script: echo $FLAGS
+```
+
+This will print out the flags used. Note that even if the short form
+is used, the flag prefix is still the same. Also note that default
+values are also outputted.
+
+```
+$ po flags --name Alice
+--name Alice
+
+$ po flags -n Alice
+--name Alice
+
+$ po flags
+--name World
+```
+
+You can customize the prefix used with the `flags_prefix` option:
+
+```yaml
+commands:
+  flags:
+    short: Prints the flags
+    flags:
+      name:
+        type: string
+        desc: a name
+        short: n
+        default: World
+        flags_prefix: --fullname=
+    script: echo $FLAGS
+```
+
+This allows you to give flags a different name in po compared to the
+subcommand called in the script:
+
+```
+$ po flags --name Alice
+--fullname=Alice
 ```
 
 
