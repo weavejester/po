@@ -92,10 +92,11 @@ func (arg *Argument) Validate() error {
 }
 
 type Flag struct {
-	Desc    string
-	Short   string
-	Type    string
-	Default string
+	Desc         string
+	Short        string
+	Type         string
+	Default      string
+	FlagsPrefixP *string `yaml:"flags_prefix"`
 }
 
 func (a *Flag) Merge(b *Flag) {
@@ -661,18 +662,29 @@ func flagEnvVars(flags *pflag.FlagSet) []string {
 	return env[:i]
 }
 
-func allFlagsEnvVar(flags *pflag.FlagSet) string {
+func flagsPrefix(name string, flag *Flag) string {
+	if flag.FlagsPrefixP == nil {
+		return fmt.Sprintf("--%s ", name)
+	} else {
+		return *flag.FlagsPrefixP
+	}
+}
+
+func allFlagsEnvVar(flagDefs map[string]Flag, flags *pflag.FlagSet) string {
 	args := make([]string, countFlagsWithValues(flags))
 	i := 0
 
 	visitFlagsWithValues(flags, func(f *pflag.Flag) {
+		def := flagDefs[f.Name]
+		prefix := flagsPrefix(f.Name, &def)
+
 		if f.Value.Type() == "bool" {
 			if f.Value.String() != "false" {
-				args[i] = fmt.Sprintf("--%s", f.Name)
+				args[i] = strings.Trim(prefix, " ")
 				i++
 			}
 		} else {
-			args[i] = fmt.Sprintf("--%s %s", f.Name, flagValueOrDefault(f))
+			args[i] = strings.Trim(prefix+flagValueOrDefault(f), " ")
 			i++
 		}
 	})
@@ -968,6 +980,7 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 	configEnv := configEnvVars(config)
 
 	commandArgs := command.Args
+	commandFlags := command.Flags
 	exec := command.Exec
 	script := command.Script
 
@@ -976,7 +989,7 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 		env = append(env, configEnv...)
 		env = append(env, argEnvVars(commandArgs, args)...)
 		env = append(env, flagEnvVars(cmd.Flags())...)
-		env = append(env, allFlagsEnvVar(cmd.Flags()))
+		env = append(env, allFlagsEnvVar(commandFlags, cmd.Flags()))
 
 		if err := execScript(exec, env, script); err != nil {
 			log.Fatalf("error: %v", err)

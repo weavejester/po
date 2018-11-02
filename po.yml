@@ -55,6 +55,7 @@ commands:
       bar:
         desc: int flag
         type: int
+        flags_prefix: --bar=
     script: echo $FLAGS
 
   group:
