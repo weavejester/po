@@ -34,7 +34,7 @@ commands:
 
   envvars:
     short: Tests environment vars
-    run: |
+    script: |
       echo PWD=$PWD
       echo POPATH=$POPATH
       echo POHOME=$POHOME
