@@ -622,6 +622,10 @@ func argEnvVars(defs []Argument, args []string) []string {
 	return env
 }
 
+func allArgsEnvVar(args []string) string {
+	return "ARGS=" + strings.Join(args, " ")
+}
+
 func visitFlagsWithValues(flags *pflag.FlagSet, fn func(*pflag.Flag)) {
 	flags.VisitAll(func(flag *pflag.Flag) {
 		if flag.Changed || flag.DefValue != "" {
@@ -988,6 +992,7 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 		env := os.Environ()
 		env = append(env, configEnv...)
 		env = append(env, argEnvVars(commandArgs, args)...)
+		env = append(env, allArgsEnvVar(args))
 		env = append(env, flagEnvVars(cmd.Flags())...)
 		env = append(env, allFlagsEnvVar(commandFlags, cmd.Flags()))
 

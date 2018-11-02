@@ -58,6 +58,13 @@ commands:
         flags_prefix: --bar=
     script: echo $FLAGS
 
+  arguer:
+    short: Args test
+    args:
+      - var: a
+      - var: b
+    script: echo $ARGS
+
   group:
     short: A grouping of commands
     commands:
