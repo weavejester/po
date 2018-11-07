@@ -1107,6 +1107,7 @@ var rootCmd = &cobra.Command{
 	Version:       "0.0.1",
 	SilenceUsage:  true,
 	SilenceErrors: true,
+	Args:          cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		refresh := getRootBoolFlag(cmd, "refresh")
 		commands := getRootBoolFlag(cmd, "commands")
