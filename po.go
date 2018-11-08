@@ -978,7 +978,10 @@ func buildFlags(cmd *cobra.Command, flags map[string]Flag) error {
 
 func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string) {
 	if command.Script == "" {
-		return nil
+		return func(cmd *cobra.Command, args []string) {
+			cmd.Help()
+			os.Exit(0)
+		}
 	}
 
 	configEnv := configEnvVars(config)
