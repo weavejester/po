@@ -835,13 +835,27 @@ func isRootCommand(cmd *cobra.Command) bool {
 	return !strings.Contains(cmd.Name(), ":")
 }
 
+const minCommandPadding = 8
+
+func subCommandPadding(command *cobra.Command) int {
+	padding := 0
+
+	for _, cmd := range command.Commands() {
+		if l := len(cmd.Name()); l > padding {
+			padding = l
+		}
+	}
+
+	return padding
+}
+
 func rootCommandUsages(command *cobra.Command, prefix string) string {
 	usage := ""
-	padding := command.NamePadding()
+	padding := subCommandPadding(command)
 
 	for _, cmd := range command.Commands() {
 		if isRootCommand(cmd) {
-			usage += fmt.Sprintf("%s%s %s\n", prefix, rightPad(cmd.Name(), padding), cmd.Short)
+			usage += fmt.Sprintf("%s%s  %s\n", prefix, rightPad(cmd.Name(), padding), cmd.Short)
 		}
 	}
 
@@ -863,11 +877,11 @@ func hasSubCommands(parentCmd *cobra.Command, cmd *cobra.Command) bool {
 
 func subCommandUsages(parentCmd *cobra.Command, cmd *cobra.Command) string {
 	usage := ""
-	padding := parentCmd.NamePadding()
+	padding := subCommandPadding(parentCmd)
 
 	for _, subCmd := range parentCmd.Commands() {
 		if isSubCommand(cmd, subCmd) {
-			usage += fmt.Sprintf("  %s %s\n", rightPad(subCmd.Name(), padding), subCmd.Short)
+			usage += fmt.Sprintf("  %s  %s\n", rightPad(subCmd.Name(), padding), subCmd.Short)
 		}
 	}
 
