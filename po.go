@@ -238,10 +238,10 @@ func mergeStringMaps(a map[string]string, b map[string]string) {
 }
 
 type Config struct {
-	Imports  []Import
-	Aliases  map[string]string
-	Vars     map[string]string
-	Commands map[string]Command
+	Imports     []Import
+	Aliases     map[string]string
+	Environment map[string]string
+	Commands    map[string]Command
 }
 
 func (a *Config) Merge(b *Config) {
@@ -251,10 +251,10 @@ func (a *Config) Merge(b *Config) {
 		mergeCommands(a.Commands, b.Commands)
 	}
 
-	if a.Vars == nil {
-		a.Vars = b.Vars
-	} else if b.Vars != nil {
-		mergeStringMaps(a.Vars, b.Vars)
+	if a.Environment == nil {
+		a.Environment = b.Environment
+	} else if b.Environment != nil {
+		mergeStringMaps(a.Environment, b.Environment)
 	}
 
 	if a.Aliases == nil {
@@ -697,14 +697,14 @@ func allFlagsEnvVar(flagDefs map[string]Flag, flags *pflag.FlagSet) string {
 }
 
 func configEnvVars(config *Config) []string {
-	if config.Vars == nil {
+	if config.Environment == nil {
 		return []string{}
 	}
 
-	env := make([]string, len(config.Vars))
+	env := make([]string, len(config.Environment))
 	i := 0
 
-	for k, v := range config.Vars {
+	for k, v := range config.Environment {
 		env[i] = fmt.Sprintf("%s=%s", k, v)
 		i++
 	}

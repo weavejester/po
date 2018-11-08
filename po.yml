@@ -1,6 +1,6 @@
 imports:
   - file: import.yml
-vars:
+environment:
   aaa: hello
   bbb: world
 aliases:

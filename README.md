@@ -306,14 +306,14 @@ $ po flags --name Alice
 ```
 
 
-### Vars
+### Environment
 
 You've probably noticed that flags and arguments are passed to the run
 scripts for the commands as environment variables. You can also define
-static variables in the `vars` directive:
+static variables in the `environment` directive:
 
 ```yaml
-vars:
+environment:
   greet: Hey
 commands:
   hello:
