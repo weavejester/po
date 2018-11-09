@@ -866,6 +866,11 @@ func isSubCommand(parentCmd *cobra.Command, cmd *cobra.Command) bool {
 	return strings.HasPrefix(cmd.Name(), parentCmd.Name()+":")
 }
 
+func isDirectSubCommand(parentCmd *cobra.Command, cmd *cobra.Command) bool {
+	prefix := parentCmd.Name()+":"
+	return isSubCommand(parentCmd, cmd) && !strings.Contains(cmd.Name()[len(prefix):], ":") 
+}
+
 func hasSubCommands(parentCmd *cobra.Command, cmd *cobra.Command) bool {
 	for _, subCmd := range parentCmd.Commands() {
 		if isSubCommand(cmd, subCmd) {
@@ -880,7 +885,7 @@ func subCommandUsages(parentCmd *cobra.Command, cmd *cobra.Command) string {
 	padding := subCommandPadding(parentCmd)
 
 	for _, subCmd := range parentCmd.Commands() {
-		if isSubCommand(cmd, subCmd) {
+		if isDirectSubCommand(cmd, subCmd) {
 			usage += fmt.Sprintf("  %s  %s\n", rightPad(subCmd.Name(), padding), subCmd.Short)
 		}
 	}
