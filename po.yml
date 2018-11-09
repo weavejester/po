@@ -13,7 +13,7 @@ commands:
       An example command that just prints a short message.
     args:
       - var: name
-        short: a name to say hello to
+        desc: a name to say hello to
         amount:
           at_least: 0
           at_most: 1

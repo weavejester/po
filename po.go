@@ -73,7 +73,7 @@ func (amount *Amount) Validate() error {
 
 type Argument struct {
 	Var    string
-	Short  string
+	Desc   string
 	Amount Amount
 }
 
@@ -81,8 +81,8 @@ func (a *Argument) Merge(b *Argument) {
 	if b.Var != "" {
 		a.Var = b.Var
 	}
-	if b.Short != "" {
-		a.Short = b.Short
+	if b.Desc != "" {
+		a.Desc = b.Desc
 	}
 	a.Amount.Merge(&b.Amount)
 }
@@ -825,7 +825,7 @@ func argUsages(command *Command) string {
 
 	for _, arg := range command.Args {
 		argvar := strings.ToUpper(arg.Var)
-		usage += fmt.Sprintf("  %s %s\n", rightPad(argvar, padding), arg.Short)
+		usage += fmt.Sprintf("  %s %s\n", rightPad(argvar, padding), arg.Desc)
 	}
 
 	return usage

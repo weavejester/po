@@ -152,7 +152,7 @@ USAGE
   po hello NAME [FLAGS]
 
 ARGUMENTS
-  NAME
+  NAME     a name to greet
 
 FLAGS
   -h, --help   help for hello
