@@ -831,27 +831,33 @@ func argUsages(command *Command) string {
 	return usage
 }
 
-func isRootCommand(cmd *cobra.Command) bool {
-	return !strings.Contains(cmd.Name(), ":")
-}
-
 const minCommandPadding = 8
 
-func subCommandPadding(command *cobra.Command) int {
-	padding := 0
+func subCommandPadding(command *cobra.Command, pred func(*cobra.Command) bool) int {
+	padding := minCommandPadding
 
 	for _, cmd := range command.Commands() {
-		if l := len(cmd.Name()); l > padding {
-			padding = l
+		if pred(cmd) {
+			if l := len(cmd.Name()); l > padding {
+				padding = l
+			}
 		}
 	}
 
 	return padding
 }
 
+func isRootCommand(cmd *cobra.Command) bool {
+	return !strings.Contains(cmd.Name(), ":")
+}
+
+func rootCommandPadding(command *cobra.Command) int {
+	return subCommandPadding(command, isRootCommand)
+}
+
 func rootCommandUsages(command *cobra.Command, prefix string) string {
 	usage := ""
-	padding := subCommandPadding(command)
+	padding := rootCommandPadding(command)
 
 	for _, cmd := range command.Commands() {
 		if isRootCommand(cmd) {
@@ -871,6 +877,13 @@ func isDirectSubCommand(parentCmd *cobra.Command, cmd *cobra.Command) bool {
 	return isSubCommand(parentCmd, cmd) && !strings.Contains(cmd.Name()[len(prefix):], ":") 
 }
 
+func directSubCommandPadding(parentCmd *cobra.Command, cmd *cobra.Command) int {
+	pred := func(subCmd *cobra.Command) bool {
+		return isDirectSubCommand(cmd, subCmd)
+	}
+	return subCommandPadding(parentCmd, pred)
+}
+
 func hasSubCommands(parentCmd *cobra.Command, cmd *cobra.Command) bool {
 	for _, subCmd := range parentCmd.Commands() {
 		if isSubCommand(cmd, subCmd) {
@@ -882,7 +895,7 @@ func hasSubCommands(parentCmd *cobra.Command, cmd *cobra.Command) bool {
 
 func subCommandUsages(parentCmd *cobra.Command, cmd *cobra.Command) string {
 	usage := ""
-	padding := subCommandPadding(parentCmd)
+	padding := directSubCommandPadding(parentCmd, cmd)
 
 	for _, subCmd := range parentCmd.Commands() {
 		if isDirectSubCommand(cmd, subCmd) {
