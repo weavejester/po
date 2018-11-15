@@ -72,9 +72,22 @@ func (amount *Amount) Validate() error {
 }
 
 type Argument struct {
-	Var    string
-	Desc   string
-	Amount Amount
+	Var      string
+	Desc     string
+	Amount   Amount
+	Optional bool
+}
+
+func (arg *Argument) AtLeast() int {
+	if arg.Optional {
+		return 0
+	} else {
+		return arg.Amount.AtLeast()
+	}
+}
+
+func (arg *Argument) AtMost() int {
+	return arg.Amount.AtMost()
 }
 
 func (a *Argument) Merge(b *Argument) {
@@ -570,7 +583,7 @@ func minArgLength(defs []Argument) int {
 	minLength := 0
 
 	for _, def := range defs {
-		minLength += def.Amount.AtLeast()
+		minLength += def.AtLeast()
 	}
 
 	return minLength
@@ -580,7 +593,7 @@ func maxArgLength(defs []Argument) int {
 	maxLength := 0
 
 	for _, def := range defs {
-		if atMost := def.Amount.AtMost(); atMost == 0 {
+		if atMost := def.AtMost(); atMost == 0 {
 			return -1
 		} else {
 			maxLength += atMost
@@ -600,12 +613,12 @@ func argEnvVars(defs []Argument, args []string) []string {
 	a := 0
 
 	for i, def := range defs {
-		required -= def.Amount.AtLeast()
+		required -= def.AtLeast()
 		maxSlice := len(args) - required
 
 		aNext := a
 
-		if atMost := def.Amount.AtMost(); atMost == 0 {
+		if atMost := def.AtMost(); atMost == 0 {
 			aNext += maxSlice
 		} else {
 			aNext += atMost
@@ -781,11 +794,11 @@ func execScript(exec string, env []string, script string) error {
 func formatArgDef(def Argument) string {
 	arg := strings.ToUpper(def.Var)
 
-	if def.Amount.AtLeast() > 1 || def.Amount.AtMost() != 1 {
+	if def.AtLeast() > 1 || def.AtMost() != 1 {
 		arg = fmt.Sprintf("%s...", arg)
 	}
 
-	if def.Amount.AtLeast() < 1 {
+	if def.AtLeast() < 1 {
 		arg = fmt.Sprintf("[%s]", arg)
 	}
 
