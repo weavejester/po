@@ -128,14 +128,15 @@ func (a *Flag) Merge(b *Flag) {
 }
 
 type Command struct {
-	Short    string
-	Long     string
-	Args     []Argument
-	Flags    map[string]Flag
-	Example  string
-	Exec     string
-	Script   string
-	Commands map[string]Command
+	Short       string
+	Long        string
+	Args        []Argument
+	Flags       map[string]Flag
+	Example     string
+	Environment map[string]string
+	Exec        string
+	Script      string
+	Commands    map[string]Command
 }
 
 func (cmd *Command) MaxArgLength() int {
@@ -709,15 +710,15 @@ func allFlagsEnvVar(flagDefs map[string]Flag, flags *pflag.FlagSet) string {
 	return "FLAGS=" + strings.Join(args[:i], " ")
 }
 
-func configEnvVars(config *Config) []string {
-	if config.Environment == nil {
+func envVarsFromMap(m map[string]string) []string {
+	if m == nil {
 		return []string{}
 	}
 
-	env := make([]string, len(config.Environment))
+	env := make([]string, len(m))
 	i := 0
 
-	for k, v := range config.Environment {
+	for k, v := range m {
 		env[i] = fmt.Sprintf("%s=%s", k, v)
 		i++
 	}
@@ -886,8 +887,8 @@ func isSubCommand(parentCmd *cobra.Command, cmd *cobra.Command) bool {
 }
 
 func isDirectSubCommand(parentCmd *cobra.Command, cmd *cobra.Command) bool {
-	prefix := parentCmd.Name()+":"
-	return isSubCommand(parentCmd, cmd) && !strings.Contains(cmd.Name()[len(prefix):], ":") 
+	prefix := parentCmd.Name() + ":"
+	return isSubCommand(parentCmd, cmd) && !strings.Contains(cmd.Name()[len(prefix):], ":")
 }
 
 func directSubCommandPadding(parentCmd *cobra.Command, cmd *cobra.Command) int {
@@ -1021,7 +1022,13 @@ func buildFlags(cmd *cobra.Command, flags map[string]Flag) error {
 	return nil
 }
 
-func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string) {
+func cloneEnv(env []string) []string {
+	envCopy := make([]string, len(env))
+	copy(envCopy, env)
+	return envCopy
+}
+
+func makeRunFunc(config *Config, env []string, command *Command) func(*cobra.Command, []string) {
 	if command.Script == "" {
 		return func(cmd *cobra.Command, args []string) {
 			cmd.Help()
@@ -1029,16 +1036,13 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 		}
 	}
 
-	configEnv := configEnvVars(config)
-
 	commandArgs := command.Args
 	commandFlags := command.Flags
 	exec := command.Exec
 	script := command.Script
 
 	return func(cmd *cobra.Command, args []string) {
-		env := os.Environ()
-		env = append(env, configEnv...)
+		env := cloneEnv(env)
 		env = append(env, argEnvVars(commandArgs, args)...)
 		env = append(env, allArgsEnvVar(args))
 		env = append(env, flagEnvVars(cmd.Flags())...)
@@ -1050,7 +1054,10 @@ func makeRunFunc(config *Config, command *Command) func(*cobra.Command, []string
 	}
 }
 
-func buildCommand(config *Config, parentCmd *cobra.Command, name string, command *Command) (*cobra.Command, error) {
+func buildCommand(parentCmd *cobra.Command, config *Config, env []string, name string, command *Command) (*cobra.Command, error) {
+	env = cloneEnv(env)
+	env = append(env, envVarsFromMap(command.Environment)...)
+	
 	cmd := cobra.Command{
 		Use:                   formatUsage(name, command),
 		Aliases:               getCommandAliases(config, name),
@@ -1059,7 +1066,7 @@ func buildCommand(config *Config, parentCmd *cobra.Command, name string, command
 		Args:                  argsMatchDefs(command.Args),
 		Example:               command.Example,
 		DisableFlagsInUseLine: true,
-		Run:                   makeRunFunc(config, command),
+		Run:                   makeRunFunc(config, env, command),
 	}
 	cmd.SetUsageFunc(makeUsageFunc(parentCmd, command))
 	cmd.SetHelpFunc(helpFunc)
@@ -1069,7 +1076,7 @@ func buildCommand(config *Config, parentCmd *cobra.Command, name string, command
 	}
 
 	for subname, subcommand := range command.Commands {
-		_, err := buildCommand(config, parentCmd, name+":"+subname, &subcommand)
+		_, err := buildCommand(parentCmd, config, env, name+":"+subname, &subcommand)
 
 		if err != nil {
 			return &cmd, err
@@ -1081,8 +1088,11 @@ func buildCommand(config *Config, parentCmd *cobra.Command, name string, command
 }
 
 func buildCommandsFromConfig(config *Config, parentCmd *cobra.Command) error {
+	env := os.Environ()
+	env = append(env, envVarsFromMap(config.Environment)...)
+	
 	for name, command := range config.Commands {
-		_, err := buildCommand(config, parentCmd, name, &command)
+		_, err := buildCommand(parentCmd, config, env, name, &command)
 
 		if err != nil {
 			return err

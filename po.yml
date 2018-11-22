@@ -32,12 +32,15 @@ commands:
 
   envvars:
     short: Tests environment vars
+    environment:
+      ccc: wow
     script: |
       echo PWD=$PWD
       echo POPATH=$POPATH
       echo POHOME=$POHOME
       echo aaa=$aaa
       echo bbb=$bbb
+      echo ccc=$ccc
 
   py:
     short: Tests a different interpreter
@@ -65,7 +68,9 @@ commands:
 
   group:
     short: A grouping of commands
+    environment:
+      ddd: man!
     commands:
       subtask:
         short: A subtask
-        script: echo Subtasking around
+        script: echo Subtasking around $ddd
