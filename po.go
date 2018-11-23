@@ -594,7 +594,7 @@ func loadAllConfigs() (*Config, error) {
 		return nil, err
 	}
 
-	userCfg, err := readConfigFile(userCfgPath)
+	userCfg, err := readConfigFileIfExists(userCfgPath)
 
 	if err != nil {
 		return nil, err
