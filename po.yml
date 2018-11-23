@@ -68,6 +68,8 @@ commands:
 
   group:
     short: A grouping of commands
+    imports:
+      - file: import.yml
     environment:
       ddd: man!
     commands:

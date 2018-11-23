@@ -137,6 +137,7 @@ type Command struct {
 	Exec        string
 	Script      string
 	Commands    map[string]Command
+	Imports     []Import
 }
 
 func (cmd *Command) MaxArgLength() int {
@@ -196,8 +197,24 @@ func (a *Command) Merge(b *Command) {
 		a.Args = b.Args
 	}
 
-	mergeFlags(a.Flags, b.Flags)
-	mergeCommands(a.Commands, b.Commands)
+	if a.Flags == nil {
+		a.Flags = b.Flags
+	} else if b.Flags != nil {
+		mergeFlags(a.Flags, b.Flags)
+	}
+
+	if a.Commands == nil {
+		a.Commands = b.Commands
+	} else if b.Commands != nil {
+		mergeCommands(a.Commands, b.Commands)
+	}
+	
+	if a.Environment == nil {
+		a.Environment = b.Environment
+	} else if b.Environment != nil {
+		mergeStringMaps(a.Environment, b.Environment)
+	}
+
 }
 
 var commandNameRegexp = regexp.MustCompile(`^\pL[\pL\d-_]*$`)
@@ -463,6 +480,20 @@ func findImportPath(importPath string, parents []Import) string {
 }
 
 func readImport(imp Import, parents []Import) (*Config, error) {
+	if imp.File != "" && imp.Url != "" {
+		return nil, fmt.Errorf("cannot have an import with a file and a URL set")
+	}
+
+	if hasImport(parents, imp) {
+		return nil, fmt.Errorf("cyclic dependency in imports")
+	}
+
+	lastParent := parents[len(parents)-1]
+
+	if imp.File != "" && lastParent.Url != "" {
+		return nil, fmt.Errorf("cannot load a file import referenced from a URL")
+	}
+
 	if imp.File != "" {
 		return readConfigFile(findImportPath(imp.File, parents))
 	} else {
@@ -479,22 +510,12 @@ func hasImport(haystack []Import, needle Import) bool {
 	return false
 }
 
-func loadImports(config *Config, parents []Import) error {
-	lastParent := parents[len(parents)-1]
+type Importable interface {
+	LoadImports([]Import) error
+}
 
+func (config *Config) LoadImports(parents []Import) error {
 	for _, imp := range config.Imports {
-		if imp.File != "" && imp.Url != "" {
-			return fmt.Errorf("cannot have an import with a file and a URL set")
-		}
-
-		if hasImport(parents, imp) {
-			return fmt.Errorf("cyclic dependency in imports")
-		}
-
-		if imp.File != "" && lastParent.Url != "" {
-			return fmt.Errorf("cannot load a file import referenced from a URL")
-		}
-
 		importedCfg, err := readImport(imp, parents)
 
 		if err != nil {
@@ -503,7 +524,7 @@ func loadImports(config *Config, parents []Import) error {
 
 		parents = append(parents, imp)
 
-		if err := loadImports(importedCfg, parents); err != nil {
+		if err := importedCfg.LoadImports(parents); err != nil {
 			return err
 		}
 
@@ -515,8 +536,52 @@ func loadImports(config *Config, parents []Import) error {
 	return nil
 }
 
-func loadRootImports(config *Config, path string) error {
-	return loadImports(config, []Import{Import{File: path}})
+func (command *Command) LoadImports(parents []Import) error {
+	for _, imp := range command.Imports {
+		importedCfg, err := readImport(imp, parents)
+
+		if err != nil {
+			return err
+		}
+
+		parents = append(parents, imp)
+
+		if err := importedCfg.LoadImports(parents); err != nil {
+			return err
+		}
+
+		parents = parents[:len(parents)-1]
+
+		command.Merge(&Command{
+			Commands:    importedCfg.Commands,
+			Environment: importedCfg.Environment,
+		})
+	}
+
+	return nil	
+}
+
+func walkCommands(commands map[string]Command, f func(*Command)) {
+	for _, cmd := range commands {
+		f(&cmd)
+		for _, cmd := range cmd.Commands {
+			f(&cmd)
+		}
+	}
+}
+
+func loadAllImports(config *Config, path string) error {
+	imports := []Import{Import{File: path}}
+	
+	if err := config.LoadImports(imports); err != nil {
+		return err
+	}
+
+	walkCommands(config.Commands, func(cmd *Command) {
+		cmd.LoadImports(imports)
+	})
+
+	return nil
 }
 
 const poPathEnvVar = "POPATH"
@@ -536,7 +601,7 @@ func loadAllConfigs() (*Config, error) {
 	}
 
 	if userCfg != nil {
-		if err := loadRootImports(userCfg, userCfgPath); err != nil {
+		if err := loadAllImports(userCfg, userCfgPath); err != nil {
 			return nil, err
 		}
 	}
@@ -562,7 +627,7 @@ func loadAllConfigs() (*Config, error) {
 	}
 
 	if projectCfg != nil {
-		if err := loadRootImports(projectCfg, projectCfgPath); err != nil {
+		if err := loadAllImports(projectCfg, projectCfgPath); err != nil {
 			return nil, err
 		}
 	}
