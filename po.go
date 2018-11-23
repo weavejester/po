@@ -1227,7 +1227,7 @@ func getRootBoolFlag(cmd *cobra.Command, name string) bool {
 var rootCmd = &cobra.Command{
 	Use:           "po",
 	Short:         "CLI for managing project-specific scripts",
-	Version:       "0.1.0",
+	Version:       "0.1.1",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	Args:          cobra.NoArgs,
