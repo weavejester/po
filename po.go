@@ -176,6 +176,7 @@ func mergeCommands(a map[string]Command, b map[string]Command) {
 	for k, vb := range b {
 		if va, ok := a[k]; ok {
 			va.Merge(&vb)
+			a[k] = va
 		} else {
 			a[k] = vb
 		}
