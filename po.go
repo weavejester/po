@@ -134,6 +134,7 @@ type Command struct {
 	Flags       map[string]Flag
 	Example     string
 	Environment map[string]string
+	WorkDir     string
 	Exec        string
 	Script      string
 	Commands    map[string]Command
@@ -187,11 +188,17 @@ func (a *Command) Merge(b *Command) {
 	if b.Short != "" {
 		a.Short = b.Short
 	}
+
 	if b.Long != "" {
 		a.Long = b.Long
 	}
+
 	if b.Script != "" {
 		a.Script = b.Script
+	}
+
+	if b.WorkDir != "" {
+		a.WorkDir = b.WorkDir
 	}
 
 	if len(b.Args) > 0 {
@@ -585,7 +592,6 @@ func loadAllImports(config *Config, path string) error {
 	return nil
 }
 
-const poPathEnvVar = "POPATH"
 const poHomeEnvVar = "POHOME"
 
 func loadAllConfigs() (*Config, error) {
@@ -613,7 +619,7 @@ func loadAllConfigs() (*Config, error) {
 		return nil, err
 	}
 
-	if err := os.Setenv(poPathEnvVar, filepath.Dir(projectCfgPath)); err != nil {
+	if err := os.Chdir(filepath.Dir(projectCfgPath)); err != nil {
 		return nil, err
 	}
 
@@ -1106,8 +1112,13 @@ func makeRunFunc(config *Config, env []string, command *Command) func(*cobra.Com
 	commandFlags := command.Flags
 	exec := command.Exec
 	script := command.Script
+	workDir := command.WorkDir
 
 	return func(cmd *cobra.Command, args []string) {
+		if workDir != "" {
+			os.Chdir(workDir)
+		}
+
 		env := cloneEnv(env)
 		env = append(env, argEnvVars(commandArgs, args)...)
 		env = append(env, allArgsEnvVar(args))

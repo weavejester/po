@@ -1,0 +1,5 @@
+commands:
+  subdir:
+    short: Command from subdirectory
+    script:
+      echo PWD=$PWD

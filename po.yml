@@ -69,10 +69,12 @@ commands:
   group:
     short: A grouping of commands
     imports:
-      - file: import.yml
+      - file: example/po.yml
     environment:
       ddd: man!
     commands:
       subtask:
         short: A subtask
         script: echo Subtasking around $ddd
+      subdir:
+        workdir: example
