@@ -382,6 +382,26 @@ cache and re-download imported URLs, run:
 $ po --refresh
 ```
 
+Imports can also be nested under commands. For example we could write:
+
+```yaml
+commands:
+  hello:
+    short: Prints a greeting
+    long: Prints a greeting to STDOUT.
+    flags:
+      name:
+        type: string
+        desc: a name to greet
+        default: World
+    script: echo Hello $name
+    imports:
+      - url: https://git.io/fxVcZ
+```
+
+This adds a command `po hello:bye` instead of `po bye`. See the
+section on nesting for more information.
+
 
 ### Exec
 
