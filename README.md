@@ -429,6 +429,22 @@ commands:
 Flags and arguments are still handled through environment variables.
 
 
+### Working Directory
+
+By default the working directory is the directory of the first
+`po.yml` file found, otherwise known as the project root. This can be
+changed with the `workdir` option, which is defined relative to the
+project root:
+
+```yaml
+commands:
+  pwd:
+    short: Print the working directory
+    workdir: subdir
+    script: echo $PWD
+```
+
+
 ### Nesting
 
 Commands can be nested below other commands. We can use this to add an
